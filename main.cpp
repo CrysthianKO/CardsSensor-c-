@@ -52,9 +52,9 @@ int main() {
             if(area < 20000) continue;
             cv::Rect caixa_da_carta = cv::boundingRect(contornos[i]);
 
-            // std::cout << "CARTA DETECTADA! X: " << caixa_da_carta.x 
-            // << " | Y: " << caixa_da_carta.y 
-            // << " | Area: " << area << std::endl;
+            std::cout << "CARTA DETECTADA! X: " << caixa_da_carta.x 
+            << " | Y: " << caixa_da_carta.y 
+            << " | Area: " << area << std::endl;
 
             cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 3);
         }
