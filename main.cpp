@@ -47,7 +47,7 @@ int main() {
         //Aqui ele ta finding os contournos
         cv::findContours(frame_binario, contornos, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-        for(std::vector<cv::Point> contorno : contornos){
+        for(std::vector<cv::Point> contorno_atual : contornos){
             double area = cv::contourArea(contorno_atual)
             if(area < 500) continue
             cv::Rect caixa_da_carta = cv::boundingRect(contorno_atual);
