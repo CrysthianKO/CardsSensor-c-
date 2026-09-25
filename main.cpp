@@ -25,6 +25,7 @@ int main() {
 
     // A memória onde os quadros vão morar
     cv::Mat frame_colorido, frame_cinza, frame_binario;
+    std::vector<std::vector<cv::Point>> contornos;
 
     // PASSO 3: A Esteira da Linha de Montagem (Loop Infinito)
     while (true) {
@@ -39,7 +40,20 @@ int main() {
         // O Daltônico: Convertemos para cinza porque a Visão Computacional
         // procura por bordas e contrastes, não por cores. Isso poupa memória.
         cv::cvtColor(frame_colorido, frame_cinza, cv::COLOR_BGR2GRAY);
+
+        //Ajustar o 3º parametro para luz ideal
         cv::threshold(frame_cinza, frame_binario, 127, 255, cv::THRESH_BINARY);
+    
+        //Aqui ele ta finding os contournos
+        cv::findContours(frame_binario, contornos, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
+
+        for(std::vector<cv::Point> contorno : contornos){
+            double area = cv::contourArea(contorno_atual)
+            if(area < 500) continue
+            cv::Rect caixa_da_carta = cv::boundingRect(contorno_atual);
+            std:std::cout << "Carta x: " << caixa_da_carta.x << ",y: " << caixa_da_carta.y <<
+            ",altura: "<< caixa_da_carta.height << ",largura: " << caixa_da_carta.width;
+        }
 
         // Mostra o resultado na tela do Raspberry Pi
         cv::imshow("Visao do Robo (Cinza)", frame_binario);
