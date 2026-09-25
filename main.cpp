@@ -47,12 +47,16 @@ int main() {
         //Aqui ele ta finding os contournos
         cv::findContours(frame_binario, contornos, cv::RETR_EXTERNAL, cv::CHAIN_APPROX_SIMPLE);
 
-        for(std::vector<cv::Point> contorno_atual : contornos){
-            double area = cv::contourArea(contorno_atual);
-            if(area < 20000) continue;
-            cv::Rect caixa_da_carta = cv::boundingRect(contorno_atual);
-                std:std::cout << "Carta x: " << caixa_da_carta.x << ",y: " << caixa_da_carta.y <<
-                ",altura: "<< caixa_da_carta.height << ",largura: " << caixa_da_carta.width << std::endl;
+        for(size_t i = 0; i < contornos.size(); i++){
+            double area = cv::contourArea(contornos[i]);
+            if(area < 25000) continue;
+            cv::Rect caixa_da_carta = cv::boundingRect(contornos[i]);
+
+            // std::cout << "CARTA DETECTADA! X: " << caixa_da_carta.x 
+            // << " | Y: " << caixa_da_carta.y 
+            // << " | Area: " << area << std::endl;
+
+            cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 3);
         }
 
         // Mostra o resultado na tela do Raspberry Pi
