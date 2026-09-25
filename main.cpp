@@ -52,9 +52,21 @@ int main() {
             if(area < 20000) continue;
             cv::Rect caixa_da_carta = cv::boundingRect(contornos[i]);
 
-            std::cout << "CARTA DETECTADA! X: " << caixa_da_carta.x 
-            << " | Y: " << caixa_da_carta.y 
-            << " | Area: " << area << std::endl;
+            //Aqui é pra nao buga, pq quando corta la embaixo ele pode tentar cortar por -5 X
+            // ou por ai entao é isso mesmo
+            if (caixa_da_carta.x >= 0 && caixa_da_carta.y >= 0 && 
+                caixa_da_carta.x + caixa_da_carta.width <= frame_colorido.cols && 
+                caixa_da_carta.y + caixa_da_carta.height <= frame_colorido.rows) {
+                
+                //Aqui ele recorta a imagem da carta do imagem original e cria um clone
+                // pq se nao a imagem ia ser sobrecarregada
+                cv::Mat carta_isolada = frame_colorido(caixa_da_carta).clone();
+                cv::imshow("Carta Extraida", carta_isolada);
+            }
+
+            // std::cout << "CARTA DETECTADA! X: " << caixa_da_carta.x 
+            // << " | Y: " << caixa_da_carta.y 
+            // << " | Area: " << area << std::endl;
 
             cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 3);
         }
