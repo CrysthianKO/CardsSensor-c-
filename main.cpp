@@ -24,7 +24,7 @@ int main() {
     std::cout << "Câmera ligada! Pressione 'ESC' na janela de video para sair." << std::endl;
 
     // A memória onde os quadros vão morar
-    cv::Mat frame_colorido, frame_cinza;
+    cv::Mat frame_colorido, frame_cinza, frame_binario;
 
     // PASSO 3: A Esteira da Linha de Montagem (Loop Infinito)
     while (true) {
@@ -39,9 +39,10 @@ int main() {
         // O Daltônico: Convertemos para cinza porque a Visão Computacional
         // procura por bordas e contrastes, não por cores. Isso poupa memória.
         cv::cvtColor(frame_colorido, frame_cinza, cv::COLOR_BGR2GRAY);
+        cv::threshold(frame_cinza, frame_binario, 127, 255, cv::THRESH_BINARY);
 
         // Mostra o resultado na tela do Raspberry Pi
-        cv::imshow("Visao do Robo (Cinza)", frame_cinza);
+        cv::imshow("Visao do Robo (Cinza)", frame_binario);
 
         // Espera 1 milissegundo. Se a tecla pressionada for 'ESC' (código 27), para a esteira.
         if (cv::waitKey(1) == 27) {
