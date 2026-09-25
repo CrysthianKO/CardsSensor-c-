@@ -49,7 +49,7 @@ int main() {
 
         for(size_t i = 0; i < contornos.size(); i++){
             double area = cv::contourArea(contornos[i]);
-            if(area < 25000) continue;
+            if(area < 20000) continue;
             cv::Rect caixa_da_carta = cv::boundingRect(contornos[i]);
 
             // std::cout << "CARTA DETECTADA! X: " << caixa_da_carta.x 
