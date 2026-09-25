@@ -49,7 +49,7 @@ int main() {
 
         for(std::vector<cv::Point> contorno_atual : contornos){
             double area = cv::contourArea(contorno_atual);
-            if(area < 15000) continue;
+            if(area < 20000) continue;
             cv::Rect caixa_da_carta = cv::boundingRect(contorno_atual);
                 std:std::cout << "Carta x: " << caixa_da_carta.x << ",y: " << caixa_da_carta.y <<
                 ",altura: "<< caixa_da_carta.height << ",largura: " << caixa_da_carta.width << std::endl;
