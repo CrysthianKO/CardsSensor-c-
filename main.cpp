@@ -56,11 +56,11 @@ int main() {
             // << " | Y: " << caixa_da_carta.y 
             // << " | Area: " << area << std::endl;
 
-            cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 30);
+            cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 3);
         }
 
         // Mostra o resultado na tela do Raspberry Pi
-        cv::imshow("Visao do Robo (Cinza)", frame_binario);
+        cv::imshow("Visao do Robo (Cinza)", frame_colorido);
 
         // Espera 1 milissegundo. Se a tecla pressionada for 'ESC' (código 27), para a esteira.
         if (cv::waitKey(1) == 27) {
