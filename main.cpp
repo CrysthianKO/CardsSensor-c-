@@ -56,7 +56,7 @@ int main() {
             // << " | Y: " << caixa_da_carta.y 
             // << " | Area: " << area << std::endl;
 
-            cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 3);
+            cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 30);
         }
 
         // Mostra o resultado na tela do Raspberry Pi
