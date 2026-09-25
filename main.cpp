@@ -19,7 +19,7 @@ int main() {
     // O C++ tenta forçar a exposição na câmera usando o padrão V4L2.
     // *Aviso de Hardware:* Dependendo da versão do sistema operacional do seu Pi,
     // o driver 'libcamera' pode bloquear essa alteração via OpenCV. 
-    cap.set(cv::CAP_PROP_EXPOSURE, 150); // Ajuste este valor numérico depois
+    cap.set(cv::CAP_PROP_EXPOSURE, 1500); // Ajuste este valor numérico depois
 
     std::cout << "Câmera ligada! Pressione 'ESC' na janela de video para sair." << std::endl;
 

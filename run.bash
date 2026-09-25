@@ -13,4 +13,4 @@ echo "Building project (will only recompile changed files)..."
 
 cmake --build "$BUILD_DIR"
 
-$BUILD_DIR/$PROJECT_NAME
+libcamerify $BUILD_DIR/$PROJECT_NAME
