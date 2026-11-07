@@ -14,4 +14,4 @@ message(STATUS "Found OpenCV version: ${OpenCV_VERSION}")
 message(STATUS "OpenCV include directories: ${OpenCV_INCLUDE_DIRS}")
 
 add_executable(scanner main.cpp)
-target_link_libraries(scanner PRIVATE ${OpenCV_LIBS})
+target_link_libraries(scanner PRIVATE ${OpenCV_LIBS} gpiodcxx)

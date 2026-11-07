@@ -1,93 +1,42 @@
+#include <chrono>
+#include <gpiod.hpp>  // Header oficial do binding C++
 #include <iostream>
-#include <opencv2/opencv.hpp>
+#include <thread>
 
 int main() {
-  // PASSO 1: O "Olho" da Máquina
-  // O número '0' indica a câmera padrão. O 'CAP_V4L2' é o driver do Linux.
-  cv::VideoCapture cap(0, cv::CAP_V4L2);
+  try {
+    // 1. Instancia o controlador principal do Raspberry Pi (geralmente
+    // gpiochip0 no Pi 3 B+)
+    gpiod::chip chip("gpiochip0");
 
-  if (!cap.isOpened()) {
-    std::cerr << "ERRO: A fábrica não conseguiu ligar a câmera!" << std::endl;
-    return -1;
+    // 2. Isola a linha 17
+    gpiod::line linha_led = chip.get_line(17);
+
+    // 3. Prepara a configuração de saída
+    gpiod::line_request config;
+    config.consumer = "blink_teste_led";
+    config.request_type = gpiod::line_request::DIRECTION_OUTPUT;
+
+    // 4. Requisita o acesso exclusivo ao kernel
+    linha_led.request(config);
+
+    // 5. Acende o LED (Nível Alto - 3.3V)
+    std::cout << "LED Ligado!" << std::endl;
+    linha_led.set_value(1);
+
+    // Mantém a execução pausada por 3 segundos enquanto o LED brilha
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    // 6. Desliga o LED (Nível Baixo - 0V)
+    std::cout << "LED Desligado!" << std::endl;
+    linha_led.set_value(0);
+
+    // Ao finalizar, o destrutor libera a linha automaticamente no kernel.
+  } catch (const std::exception& e) {
+    // Captura e exibe erros (como pino já em uso ou chip inexistente)
+    std::cerr << "Falha no hardware: " << e.what() << std::endl;
+    return 1;
   }
 
-  // PASSO 2: A Física da Luz
-  // Reduzimos a resolução para que o Pi 3 consiga processar muitos quadros por
-  // segundo
-  cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
-  cap.set(cv::CAP_PROP_FRAME_HEIGHT, 480);
-
-  // O C++ tenta forçar a exposição na câmera usando o padrão V4L2.
-  // *Aviso de Hardware:* Dependendo da versão do sistema operacional do seu Pi,
-  // o driver 'libcamera' pode bloquear essa alteração via OpenCV.
-  cap.set(cv::CAP_PROP_EXPOSURE, 1500);  // Ajuste este valor numérico depois
-
-  std::cout << "Câmera ligada! Pressione 'ESC' na janela de video para sair."
-            << std::endl;
-
-  // A memória onde os quadros vão morar
-  cv::Mat frame_colorido, frame_cinza, frame_binario;
-  std::vector<std::vector<cv::Point>> contornos;
-
-  // PASSO 3: A Esteira da Linha de Montagem (Loop Infinito)
-  while (true) {
-    // "Puxa" um frame físico da câmera e empurra para a variável de memória
-    cap >> frame_colorido;
-
-    if (frame_colorido.empty()) {
-      std::cerr << "ERRO: O frame veio vazio." << std::endl;
-      break;
-    }
-
-    // O Daltônico: Convertemos para cinza porque a Visão Computacional
-    // procura por bordas e contrastes, não por cores. Isso poupa memória.
-    cv::cvtColor(frame_colorido, frame_cinza, cv::COLOR_BGR2GRAY);
-
-    // Ajustar o 3º parametro para luz ideal
-    cv::threshold(frame_cinza, frame_binario, 127, 255, cv::THRESH_BINARY);
-
-    // Aqui ele ta finding os contournos
-    cv::findContours(frame_binario, contornos, cv::RETR_EXTERNAL,
-                     cv::CHAIN_APPROX_SIMPLE);
-
-    for (size_t i = 0; i < contornos.size(); i++) {
-      double area = cv::contourArea(contornos[i]);
-      if (area < 20000) continue;
-      cv::Rect caixa_da_carta = cv::boundingRect(contornos[i]);
-
-      // Aqui é pra nao buga, pq quando corta la embaixo ele pode tentar cortar
-      // por -5 X
-      //  ou por ai entao é isso mesmo
-      if (caixa_da_carta.x >= 0 && caixa_da_carta.y >= 0 &&
-          caixa_da_carta.x + caixa_da_carta.width <= frame_colorido.cols &&
-          caixa_da_carta.y + caixa_da_carta.height <= frame_colorido.rows) {
-        // Aqui ele recorta a imagem da carta do imagem original e cria um clone
-        //  pq se nao a imagem ia ser sobrecarregada
-        cv::Mat carta_isolada = frame_colorido(caixa_da_carta).clone();
-
-        // Funcao para mostrar a carta recortada
-        //  cv::imshow("Carta Extraida", carta_isolada);
-      }
-
-      // std::cout << "CARTA DETECTADA! X: " << caixa_da_carta.x
-      // << " | Y: " << caixa_da_carta.y
-      // << " | Area: " << area << std::endl;
-
-      cv::rectangle(frame_colorido, caixa_da_carta, cv::Scalar(0, 255, 0), 3);
-    }
-
-    // Mostra o resultado na tela do Raspberry Pi
-    cv::imshow("Visao do Robo (Cinza)", frame_colorido);
-
-    // Espera 1 milissegundo. Se a tecla pressionada for 'ESC' (código 27), para
-    // a esteira.
-    if (cv::waitKey(1) == 27) {
-      break;
-    }
-  }
-
-  // PASSO 4: Fechando a Fábrica e limpando a memória
-  cap.release();
-  cv::destroyAllWindows();
   return 0;
 }
