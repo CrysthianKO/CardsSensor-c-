@@ -10,7 +10,7 @@ print("Ligando o sistema...")
 led.on()  # Envia 3.3V para o pino 17
 
 # Inicia a conexão com a câmera
-cap = cv2.VideoCapture(0)
+cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
 # O Bloco 'try' é a nossa rede de segurança
 try:
