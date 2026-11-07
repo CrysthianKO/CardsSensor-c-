@@ -1,42 +1,45 @@
-#include <chrono>
-#include <gpiod.hpp>  // Header oficial do binding C++
 #include <iostream>
+#include <chrono>
 #include <thread>
+#include <gpiod.hpp> // Header v2
 
 int main() {
-  try {
-    // 1. Instancia o controlador principal do Raspberry Pi (geralmente
-    // gpiochip0 no Pi 3 B+)
-    gpiod::chip chip("gpiochip0");
+    try {
+        // 1. O "Formulário de Uso" (Identifica seu programa no sistema)
+        gpiod::request_config req_cfg;
+        req_cfg.set_consumer("scanner_cartas_led");
 
-    // 2. Isola a linha 17
-    gpiod::line linha_led = chip.get_line(17);
+        // 2. O "Manual de Instruções" do pino
+        gpiod::line_settings settings;
+        settings.set_direction(gpiod::line::direction::OUTPUT);
+        
+        // 3. Associa a regra de saída ao GPIO 17
+        gpiod::line_config line_cfg;
+        line_cfg.add_line_settings(17, settings);
 
-    // 3. Prepara a configuração de saída
-    gpiod::line_request config;
-    config.consumer = "blink_teste_led";
-    config.request_type = gpiod::line_request::DIRECTION_OUTPUT;
+        // 4. Conecta-se ao Síndico (O controlador de pinos)
+        // No Pi 3, os pinos da placa ficam geralmente em "gpiochip0".
+        gpiod::chip chip("/dev/gpiochip0"); 
 
-    // 4. Requisita o acesso exclusivo ao kernel
-    linha_led.request(config);
+        // 5. Entrega os formulários e recebe o controle do pino validado
+        auto controle_linhas = chip.request_lines(req_cfg, line_cfg);
 
-    // 5. Acende o LED (Nível Alto - 3.3V)
-    std::cout << "LED Ligado!" << std::endl;
-    linha_led.set_value(1);
+        // 6. Chaveia fisicamente a energia (ACTIVE = 3.3V)
+        std::cout << "LED Ligado!" << std::endl;
+        controle_linhas.set_value(17, gpiod::line::value::ACTIVE);
 
-    // Mantém a execução pausada por 3 segundos enquanto o LED brilha
-    std::this_thread::sleep_for(std::chrono::seconds(3));
+        std::this_thread::sleep_for(std::chrono::seconds(3));
 
-    // 6. Desliga o LED (Nível Baixo - 0V)
-    std::cout << "LED Desligado!" << std::endl;
-    linha_led.set_value(0);
+        // 7. Corta a energia (INACTIVE = 0V)
+        std::cout << "LED Desligado!" << std::endl;
+        controle_linhas.set_value(17, gpiod::line::value::INACTIVE);
 
-    // Ao finalizar, o destrutor libera a linha automaticamente no kernel.
-  } catch (const std::exception& e) {
-    // Captura e exibe erros (como pino já em uso ou chip inexistente)
-    std::cerr << "Falha no hardware: " << e.what() << std::endl;
-    return 1;
-  }
+        // O destrutor de controle_linhas liberará o GPIO 17 automaticamente aqui.
+    } 
+    catch (const std::exception& e) {
+        std::cerr << "Falha no hardware: " << e.what() << std::endl;
+        return 1;
+    }
 
-  return 0;
+    return 0;
 }
