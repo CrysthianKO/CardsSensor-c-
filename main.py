@@ -1,90 +1,87 @@
 import cv2
-import time
-from gpiozero import LED
+import os
 
-# ==========================================
-# 1. FÍSICA E ENERGIA (Setup do Hardware)
-# ==========================================
-# Instancia o controle do pino físico 11 (GPIO 17)
-led = LED(17)
 
-print("Energizando componentes...")
-led.on()  # Dispara 3.3V no pino para acender a iluminação da carta
+# 1. Carregar os templates na memória (roda apenas uma vez na inicialização)
+def load_templates(folder_path):
+    templates = {}
+    for filename in os.listdir(folder_path):
+        if filename.endswith(".png"):
+            nome_molde = filename.split(".")[0]
+            caminho = os.path.join(folder_path, filename)
+            # Carrega em tons de cinza
+            img_template = cv2.imread(caminho, cv2.IMREAD_GRAYSCALE)
+            # Aplica binarização (tudo que for escuro vira preto, o resto branco)
+            _, template_binario = cv2.threshold(
+                img_template, 128, 255, cv2.THRESH_BINARY_INV
+            )
+            templates[nome_molde] = template_binario
+    return templates
 
-# Abre a comunicação direta com o Kernel do Linux via V4L2
-cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
 
-# O Contrato de Memória: Força a alocação de uma matriz VGA
-cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+# Dicionário em memória com todas as referências
+templates_salvos = load_templates("templates/")
 
-# ==========================================
-# 2. A REDE DE SEGURANÇA (Garantia de Desligamento)
-# ==========================================
-try:
-    if not cap.isOpened():
-        print("ERRO CRÍTICO: Falha física ao acessar o módulo da câmera.")
-    else:
-        # A Sangria do Sistema (Buffer Flush)
-        print("Limpando ruído elétrico inicial do sensor fotossensível...")
-        sucesso_inicial = False
+# Configuração da câmera e área de interesse (ajuste estes valores empíricamente)
+# ROI = (X_inicial, Y_inicial, Largura, Altura)
+ROI_CARTA = (100, 50, 60, 120)
 
-        # Tenta ler a matriz até 10 vezes (1 segundo de tolerância)
-        for tentativa in range(10):
-            ret, frame_teste = cap.read()
-            if ret and frame_teste is not None:
-                sucesso_inicial = True
-                altura, largura, _ = frame_teste.shape
-                print(
-                    f"Sinal limpo na tentativa {tentativa + 1}! Câmera estabilizada em: {largura}x{altura}px."
-                )
-                break  # Quebra o loop de tentativas, pois a imagem é válida
-            time.sleep(0.1)
+cap = cv2.VideoCapture(0)  # Inicializa a câmera
 
-        if not sucesso_inicial:
-            print("FALHA DO SENSOR: Nenhuma matriz válida recebida após 10 tentativas.")
-        else:
-            # ==========================================
-            # 3. A MATEMÁTICA (Processamento de Imagem)
-            # ==========================================
-            print("Scanner online. Pressione 'q' na janela para encerrar.")
 
-            # Coordenadas do Recorte / "Buraco da Fechadura"
-            # Importante: Como travamos a câmera em 640x480, esses valores
-            # nunca podem ser maiores que 480 (em Y) e 640 (em X).
-            y_inicial, y_final = 200, 350
-            x_inicial, x_final = 300, 400
+def identificar_simbolo(imagem_cortada, templates):
+    melhor_match = None
+    maior_valor = -1
 
-            while True:
-                ret, frame = cap.read()
+    # Prepara o recorte da câmera da mesma forma que os templates
+    gray = cv2.cvtColor(imagem_cortada, cv2.COLOR_BGR2GRAY)
+    _, img_binaria = cv2.threshold(gray, 128, 255, cv2.THRESH_BINARY_INV)
 
-                # Se ocorrer uma falha repentina (ex: mau contato no cabo durante a execução)
-                if not ret:
-                    print("Aviso: Falha repentina de leitura do hardware.")
-                    break
+    # Compara a câmera com cada template salvo
+    for nome, template_img in templates.items():
+        # TM_CCOEFF_NORMED retorna um valor de -1.0 a 1.0 (onde 1.0 é 100% igual)
+        resultado = cv2.matchTemplate(img_binaria, template_img, cv2.TM_CCOEFF_NORMED)
+        _, max_val, _, _ = cv2.minMaxLoc(resultado)
 
-                # Fatiamento da Matriz Numérica (Slicing)
-                roi = frame[y_inicial:y_final, x_inicial:x_final]
+        if max_val > maior_valor:
+            maior_valor = max_val
+            melhor_match = nome
 
-                # Conversão para escala de cinza e aplicação do filtro de Alto Contraste
-                frame_cinza = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
-                _, imagem_binaria = cv2.threshold(
-                    frame_cinza, 128, 255, cv2.THRESH_BINARY_INV
-                )
+    # Define uma taxa de confiança mínima (ex: 70% de similaridade)
+    if maior_valor > 0.7:
+        return melhor_match, maior_valor
+    return "Desconhecido", 0
 
-                # Renderização Visual
-                cv2.imshow("Scanner de Cartas (Aperte Q para sair)", imagem_binaria)
 
-                # O gatilho de saída amigável do loop principal
-                if cv2.waitKey(30) & 0xFF == ord("q"):
-                    break
+while True:
+    ret, frame = cap.read()
+    if not ret:
+        break
 
-# ==========================================
-# 4. LIBERAÇÃO DE RECURSOS (Limpeza de Memória)
-# ==========================================
-finally:
-    print("\nDesligando sistema de escaneamento...")
-    cap.release()  # Devolve a porta de vídeo para o sistema operacional
-    cv2.destroyAllWindows()  # Limpa os ponteiros de janela da memória RAM
-    led.off()  # Corta a tensão de 3.3V do pino 17
-    print("Componentes elétricos desativados com segurança.")
+    # 2. Cortar apenas a região onde os símbolos aparecem (ROI)
+    x, y, w, h = ROI_CARTA
+    recorte = frame[y : y + h, x : x + w]
+
+    # 3. Identificar o que tem no recorte
+    simbolo, confianca = identificar_simbolo(recorte, templates_salvos)
+
+    # Exibe o resultado na tela (Remover em produção para economizar processamento)
+    cv2.rectangle(frame, (x, y), (x + w, y + h), (0, 255, 0), 2)
+    cv2.putText(
+        frame,
+        f"{simbolo} ({confianca:.2f})",
+        (x, y - 10),
+        cv2.FONT_HERSHEY_SIMPLEX,
+        0.6,
+        (0, 255, 0),
+        2,
+    )
+
+    cv2.imshow("Scanner de Cartas", frame)
+    cv2.imshow("Recorte Binarizado", recorte)
+
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        break
+
+cap.release()
+cv2.destroyAllWindows()
