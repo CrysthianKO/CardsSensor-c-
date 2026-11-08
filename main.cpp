@@ -82,7 +82,7 @@ int main() {
     // Gira 90 graus para a direita (sentido horário).
     // Se a sua câmera estiver virada para o outro lado, mude para
     // ROTATE_90_COUNTERCLOCKWISE
-    rotate(frame_bruto, frame, ROTATE_90_CLOCKWISE);
+    rotate(frame_bruto, frame, ROTATE_90_COUNTERCLOCKWISE);
 
     // Recorta
     Mat recorte_numero = frame(ROI_NUMERO);
