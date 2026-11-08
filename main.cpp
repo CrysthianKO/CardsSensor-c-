@@ -65,8 +65,8 @@ int main() {
 
   // === 2. AJUSTE DO RECORTE (ROI) ===
   // Valores em Pixels: (Margem_Esquerda, Margem_Topo, Largura, Altura)
-  Rect ROI_NUMERO(200, 257, 78, 91);
-  Rect ROI_NAIPE(200, 348, 75, 91);
+  Rect ROI_NUMERO(196, 255, 78, 91);
+  Rect ROI_NAIPE(196, 348, 75, 91);
 
   Mat frame_bruto, frame;
 
@@ -78,11 +78,9 @@ int main() {
     cap >> frame_bruto;
     if (frame_bruto.empty()) break;
 
-    // === 3. ROTAÇÃO DA CÂMERA ===
-    // Gira 90 graus para a direita (sentido horário).
-    // Se a sua câmera estiver virada para o outro lado, mude para
-    // ROTATE_90_COUNTERCLOCKWISE
-    rotate(frame_bruto, frame, ROTATE_90_COUNTERCLOCKWISE);
+    Mat frame_girado;
+    rotate(frame_bruto, frame_girado, ROTATE_90_COUNTERCLOCKWISE);
+    flip(frame_girado, frame, 1);
 
     // Recorta
     Mat recorte_numero = frame(ROI_NUMERO);
