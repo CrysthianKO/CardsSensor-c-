@@ -2,6 +2,13 @@ import cv2
 import numpy as np
 import os
 import random
+import time
+from picamera.array import PiRGBArray
+from picamera import PiCamera
+from gpiozero import LED
+
+# 1. Configuração do LED no pino físico GPIO 17
+led_iluminacao = LED(17)
 
 # Estrutura de pastas para salvar as fotos reais
 DATASET_DIR = "dataset_real"
@@ -21,7 +28,16 @@ def preparar_pastas():
 # Aplica EXATAMENTE o mesmo tratamento de imagem que o seu C++ usará na leitura
 def processar_imagem_para_treino(recorte_bruto):
     cinza = cv2.cvtColor(recorte_bruto, cv2.COLOR_BGR2GRAY)
+
+    # Se a imagem for totalmente preta (sem carta), aborta o processamento para não dar erro
+    if cv2.mean(cinza)[0] < 30.0:
+        return None
+
     _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
+
+    # Lixa digital (Erosão) - ajuste para ficar igual ao seu C++
+    elemento_lixa = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
+    binaria = cv2.erode(binaria, elemento_lixa)
 
     # Encontra a tinta (Bounding Box)
     contornos, _ = cv2.findContours(binaria, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -40,10 +56,8 @@ def processar_imagem_para_treino(recorte_bruto):
         return None
 
     # Recorta e centraliza
-    apenas_tinta = binaria[
-        caixa_tinta[1] : caixa_tinta[1] + caixa_tinta[3],
-        caixa_tinta[0] : caixa_tinta[0] + caixa_tinta[2],
-    ]
+    x, y, w, h = caixa_tinta
+    apenas_tinta = binaria[y : y + h, x : x + w]
 
     maior_lado = max(apenas_tinta.shape)
     img_quadrada = np.zeros((maior_lado, maior_lado), dtype=np.uint8)
@@ -66,23 +80,35 @@ def modo_captura(grupo):
     if alvo.lower() == "sair" or alvo not in simbolos:
         return
 
-    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
-    # Lembre-se de ajustar este Rect para bater com a posição física do seu gabinete
-    ROI = (150, 100, 60, 80)
-
     print(f"\n[INSTRUÇÕES] Coloque o {alvo} na máquina.")
+    print("Ligando LED e aquecendo a câmera...")
+
+    led_iluminacao.on()  # Liga o LED do GPIO 17
+
+    # Inicializa a PiCamera nativamente
+    camera = PiCamera()
+    camera.resolution = (640, 480)
+    camera.framerate = 32
+    rawCapture = PiRGBArray(camera, size=(640, 480))
+
+    # Tempo obrigatório para a câmera balancear a luz do seu LED
+    time.sleep(2.0)
+
     print(
-        "Pressione 'C' várias vezes para capturar fotos (mova a carta milímetros para os lados para gerar variações reais)."
+        "Pressione 'C' várias vezes para capturar fotos (mova a carta milímetros para gerar variações reais)."
     )
     print("Pressione 'Q' para voltar ao menu.")
 
     contador = 0
     pasta_destino = f"{DATASET_DIR}/{grupo}/{alvo}"
 
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
+    # Lembre-se de ajustar este Rect para bater com o seu C++
+    ROI = (150, 100, 60, 80)
+
+    for frame_capture in camera.capture_continuous(
+        rawCapture, format="bgr", use_video_port=True
+    ):
+        frame = frame_capture.array
 
         # Simula a mesma rotação/espelhamento que você configurou no C++
         frame = cv2.rotate(frame, cv2.ROTATE_90_COUNTERCLOCKWISE)
@@ -104,10 +130,10 @@ def modo_captura(grupo):
             (0, 255, 0),
             2,
         )
-        cv2.imshow("Captura", frame)
+        cv2.imshow("Camera Bruta", frame)
 
         if processada is not None:
-            # Raio-X ampliado
+            # Mostra o Raio-X grandão para você saber se o corte ficou perfeito
             cv2.imshow(
                 "Raio-X (Treino)",
                 cv2.resize(processada, (200, 200), interpolation=cv2.INTER_NEAREST),
@@ -122,7 +148,12 @@ def modo_captura(grupo):
         elif tecla == ord("q"):
             break
 
-    cap.release()
+        # Limpa o buffer para o próximo frame
+        rawCapture.truncate(0)
+
+    # Ao sair do loop (apertar Q), desliga os hardwares
+    camera.close()
+    led_iluminacao.off()
     cv2.destroyAllWindows()
 
 
@@ -137,6 +168,8 @@ def treinar_modelo_svm(grupo, nome_arquivo_xml):
 
         for arquivo in arquivos:
             img = cv2.imread(f"{pasta}/{arquivo}", cv2.IMREAD_GRAYSCALE)
+            if img is None:
+                continue
 
             # Adiciona dados sintéticos extras a partir da sua foto real (Data Augmentation)
             for _ in range(5):
