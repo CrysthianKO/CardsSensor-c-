@@ -18,27 +18,70 @@ const vector<string> NOME_SIMBOLOS = {
 // Adicionamos o parametro 'nome_janela' para debug visual
 string identificarSimbolo(const Mat& recorte, Ptr<SVM> modelo_svm,
                           string nome_janela) {
-  Mat cinza, binaria, redimensionada;
-
+  Mat cinza, binaria;
   cvtColor(recorte, cinza, COLOR_BGR2GRAY);
 
-  // === 1. A MÁGICA DA ILUMINAÇÃO (OTSU) ===
-  // Ao invés do 128 fixo, passamos 0 e a flag THRESH_OTSU.
-  // O OpenCV calcula automaticamente a melhor separação de tinta/fundo para
-  // esta exata iluminação.
+  // Gatilho de presença
+  if (mean(cinza)[0] < 50.0) return "Vazio";
+
+  // 1. Separação de cores (Otsu)
   threshold(cinza, binaria, 0, 255, THRESH_BINARY_INV | THRESH_OTSU);
 
-  resize(binaria, redimensionada, Size(20, 20));
+  // === 2. A LIXA DIGITAL (EROSÃO) ===
+  // Cria um 'esfregão' de 2x2 pixels.
+  // Se o símbolo continuar grosso, aumente para Size(3, 3).
+  // Se ficar fino demais e sumir pedaços, diminua para Size(1, 1) ou comente
+  // essas duas linhas.
+  Mat elemento_lixa = getStructuringElement(MORPH_RECT, Size(2, 2));
+  erode(binaria, binaria, elemento_lixa);
 
-  // === 2. A JANELA DE RAIO-X (DEBUG) ===
-  // Ampliamos a minúscula imagem de 20x20 para 200x200 SEM borrar
-  // (INTER_NEAREST) para você conseguir ver a olho nu os pixels quadrados que o
-  // SVM vai julgar.
+  // === 3. ENCONTRANDO A TINTA (BOUNDING BOX) ===
+  vector<vector<Point>> contornos;
+  // Procura todas as ilhas de pixels brancos na imagem
+  findContours(binaria, contornos, RETR_EXTERNAL, CHAIN_APPROX_SIMPLE);
+
+  if (contornos.empty()) return "Vazio";
+
+  // Acha o maior contorno (ignora pequenas sujeiras no papel)
+  double maior_area = 0;
+  Rect caixa_tinta;
+  for (const auto& contorno : contornos) {
+    double area = contourArea(contorno);
+    if (area > maior_area) {
+      maior_area = area;
+      caixa_tinta = boundingRect(contorno);
+    }
+  }
+
+  // Se o maior contorno for um cisco, ignora
+  if (maior_area < 20) return "Vazio";
+
+  // Recorta a imagem cirurgicamente na borda exata do símbolo
+  Mat apenas_tinta = binaria(caixa_tinta);
+
+  // === 4. CENTRALIZANDO SEM DISTORCER (ASPECT RATIO) ===
+  // Descobre qual é o maior lado do símbolo para escalá-lo sem esmagar
+  int maior_lado = max(apenas_tinta.cols, apenas_tinta.rows);
+  Mat imagem_quadrada = Mat::zeros(maior_lado, maior_lado, CV_8UC1);
+
+  // Calcula onde colar a tinta para ela ficar exatamente no centro do quadrado
+  int x_offset = (maior_lado - apenas_tinta.cols) / 2;
+  int y_offset = (maior_lado - apenas_tinta.rows) / 2;
+
+  // Cola a tinta no quadrado preto
+  apenas_tinta.copyTo(imagem_quadrada(
+      Rect(x_offset, y_offset, apenas_tinta.cols, apenas_tinta.rows)));
+
+  // Agora sim, redimensionamos um quadrado perfeito para 20x20
+  Mat redimensionada;
+  resize(imagem_quadrada, redimensionada, Size(20, 20));
+
+  // Janela de Debug para calibração visual (Raio-X)
   Mat visao_ampliada;
   resize(redimensionada, visao_ampliada, Size(200, 200), 0, 0, INTER_NEAREST);
   imshow("Raio-X: " + nome_janela, visao_ampliada);
 
-  // Converte e manda para o modelo
+  // Prepara para o SVM e faz a previsão
   Mat linha_pixels = redimensionada.reshape(1, 1);
   Mat entrada_svm;
   linha_pixels.convertTo(entrada_svm, CV_32F);
