@@ -1,5 +1,7 @@
+#include "led.hpp"
 #include <opencv2/opencv.hpp>
 #include <opencv2/ml.hpp>
+#include <gpiod.hpp> // Header v2
 #include <iostream>
 #include <string>
 #include <vector>
@@ -50,6 +52,9 @@ string identificarSimbolo(const Mat& recorte, Ptr<SVM> modelo_svm) {
 }
 
 int main() {
+
+    ControladorLed meu_led(17);
+
     cout << "Carregando a Inteligencia Artificial..." << endl;
     
     // Carrega o arquivo XML treinado no PC
@@ -80,7 +85,7 @@ int main() {
 
     Mat frame;
     cout << "Iniciando scanner. Pressione 'q' para sair." << endl;
-
+    meu_led.ligar();
     while (true) {
         cap >> frame; // Captura imagem
         if (frame.empty()) break;
@@ -106,6 +111,8 @@ int main() {
 
         if (waitKey(1) == 'q') break;
     }
+
+    meu_led.desligar();
 
     return 0;
 }
