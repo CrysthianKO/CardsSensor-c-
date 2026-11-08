@@ -9,7 +9,7 @@ camera = Picamera2()
 camera.start_preview()
 
 # 4. Deixamos a transmissão rodando por 5 segundos
-sleep(5)
+sleep(20)
 
 # 5. Fechamos a transmissão de imagem
 camera.stop_preview()
