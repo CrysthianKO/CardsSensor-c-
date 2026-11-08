@@ -30,8 +30,8 @@ LADO = 32
 LIMIAR_PRESENCA = 50.0
 LIMIAR_VERMELHO = 30.0
 AREA_MIN = 15.0
-ROI_NUMERO = (179, 250, 100, 105)  # (x, y, largura, altura) no frame girado
-ROI_NAIPE = (179, 340, 100, 109)
+ROI_NUMERO = (179, 250, 79, 101)  # (x, y, largura, altura) no frame girado
+ROI_NAIPE = (179, 352, 82, 86)
 TAM_RAJADA = 20
 
 TECLAS_VALORES = {
