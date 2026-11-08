@@ -75,6 +75,7 @@ int main() {
     string leitura_debug;
 
     if (em_cooldown) {
+      auto agora = std::chrono::steady_clock::now();
       auto tempo_passado =
           std::chrono::duration_cast<std::chrono::milliseconds>(agora -
                                                                 momento_leitura)
@@ -101,7 +102,8 @@ int main() {
         }
         if (repeticoes >= VOTOS_NECESSARIOS) {
           cout << ">>> CARTA INSERIDA: " << leitura << endl;
-          carta_em_leitura = true;
+          momento_leitura = std::chrono::steady_clock::now();
+          em_cooldown = true;
         }
       } else {
         ultima.clear();
@@ -112,7 +114,7 @@ int main() {
     if (DEBUG_VISUAL) {
       rectangle(frame, ROI_NUMERO, Scalar(255, 0, 0), 2);
       rectangle(frame, ROI_NAIPE, Scalar(0, 0, 255), 2);
-      putText(frame, carta_em_leitura ? "TRAVADA: " + ultima : leitura_debug,
+      putText(frame, em_cooldown ? "TRAVADA: " + ultima : leitura_debug,
               Point(8, 24), FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 255, 0), 2);
       imshow("Scanner Inteligente", frame);
       if (waitKey(1) == 'q') break;
