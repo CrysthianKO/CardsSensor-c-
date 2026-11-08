@@ -15,38 +15,43 @@ const vector<string> NOME_SIMBOLOS = {
     "A",  "2", "3", "4", "5",     "6",     "7",       "8",   "9",
     "10", "J", "Q", "K", "Copas", "Ouros", "Espadas", "Paus"};
 
-string identificarSimbolo(const Mat& recorte, Ptr<SVM> modelo_svm) {
+// Adicionamos o parametro 'nome_janela' para debug visual
+string identificarSimbolo(const Mat& recorte, Ptr<SVM> modelo_svm,
+                          string nome_janela) {
   Mat cinza, binaria, redimensionada;
 
   cvtColor(recorte, cinza, COLOR_BGR2GRAY);
 
-  // === 1. GATILHO DE SOFTWARE (VERIFICA SE HÁ CARTA) ===
-  // Calcula a média de brilho do recorte.
-  // Uma carta branca refletindo o LED terá uma média alta (ex: > 100).
-  // O buraco escuro sem carta terá uma média baixa (ex: < 40).
+  // Gatilho de luminosidade (Mantido)
   Scalar media_iluminacao = mean(cinza);
+  if (media_iluminacao[0] < 50.0) return "Vazio";
 
-  // AJUSTE AQUI: Se a leitura fantasma continuar, aumente este valor (ex: 60).
-  // Se ele ignorar cartas reais, diminua (ex: 30).
-  if (media_iluminacao[0] < 50.0) {
-    return "Vazio";
-  }
+  // === 1. A MÁGICA DA ILUMINAÇÃO (OTSU) ===
+  // Ao invés do 128 fixo, passamos 0 e a flag THRESH_OTSU.
+  // O OpenCV calcula automaticamente a melhor separação de tinta/fundo para
+  // esta exata iluminação.
+  threshold(cinza, binaria, 0, 255, THRESH_BINARY_INV | THRESH_OTSU);
 
-  // Se passou do gatilho, continua o processo normal
-  threshold(cinza, binaria, 128, 255, THRESH_BINARY_INV);
   resize(binaria, redimensionada, Size(20, 20));
-  Mat linha_pixels = redimensionada.reshape(1, 1);
 
+  // === 2. A JANELA DE RAIO-X (DEBUG) ===
+  // Ampliamos a minúscula imagem de 20x20 para 200x200 SEM borrar
+  // (INTER_NEAREST) para você conseguir ver a olho nu os pixels quadrados que o
+  // SVM vai julgar.
+  Mat visao_ampliada;
+  resize(redimensionada, visao_ampliada, Size(200, 200), 0, 0, INTER_NEAREST);
+  imshow("Raio-X: " + nome_janela, visao_ampliada);
+
+  // Converte e manda para o modelo
+  Mat linha_pixels = redimensionada.reshape(1, 1);
   Mat entrada_svm;
   linha_pixels.convertTo(entrada_svm, CV_32F);
 
   float previsao = modelo_svm->predict(entrada_svm);
   int indice = static_cast<int>(previsao);
 
-  if (indice >= 0 && indice < NOME_SIMBOLOS.size()) {
+  if (indice >= 0 && indice < NOME_SIMBOLOS.size())
     return NOME_SIMBOLOS[indice];
-  }
-
   return "Erro";
 }
 
@@ -88,8 +93,8 @@ int main() {
     Mat recorte_naipe = frame(ROI_NAIPE);
 
     // Identifica
-    string valor = identificarSimbolo(recorte_numero, svm);
-    string naipe = identificarSimbolo(recorte_naipe, svm);
+    string valor = identificarSimbolo(recorte_numero, svm, "Numero");
+    string naipe = identificarSimbolo(recorte_naipe, svm, "Naipe");
 
     // === 4. LÓGICA DE DETECÇÃO ÚNICA ===
     if (valor != "Vazio" && naipe != "Vazio") {
