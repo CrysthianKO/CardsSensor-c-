@@ -5,36 +5,29 @@
 
 int main() {
     try {
-        // 1. O "Formulário de Uso" (Identifica seu programa no sistema)
-        gpiod::request_config req_cfg;
-        req_cfg.set_consumer("scanner_cartas_led");
+        // 1. Conecta-se ao Síndico (O controlador de pinos principal)
+        gpiod::chip chip("/dev/gpiochip0"); 
 
-        // 2. O "Manual de Instruções" do pino
+        // 2. Cria as configurações para o pino (Direção: Saída)
         gpiod::line_settings settings;
         settings.set_direction(gpiod::line::direction::OUTPUT);
         
-        // 3. Associa a regra de saída ao GPIO 17
-        gpiod::line_config line_cfg;
-        line_cfg.add_line_settings(17, settings);
+        // 3. Usa o construtor (Builder) para preparar a requisição do GPIO 17
+        auto controle_linhas = chip.prepare_request()
+            .set_consumer("scanner_cartas_led")
+            .add_line_settings(17, settings)
+            .do_request(); // Efetiva o bloqueio no Kernel
 
-        // 4. Conecta-se ao Síndico (O controlador de pinos)
-        // No Pi 3, os pinos da placa ficam geralmente em "gpiochip0".
-        gpiod::chip chip("/dev/gpiochip0"); 
-
-        // 5. Entrega os formulários e recebe o controle do pino validado
-        auto controle_linhas = chip.request_lines(req_cfg, line_cfg);
-
-        // 6. Chaveia fisicamente a energia (ACTIVE = 3.3V)
+        // 4. Chaveia fisicamente a energia (ACTIVE = 3.3V)
         std::cout << "LED Ligado!" << std::endl;
         controle_linhas.set_value(17, gpiod::line::value::ACTIVE);
 
         std::this_thread::sleep_for(std::chrono::seconds(3));
 
-        // 7. Corta a energia (INACTIVE = 0V)
+        // 5. Corta a energia (INACTIVE = 0V)
         std::cout << "LED Desligado!" << std::endl;
         controle_linhas.set_value(17, gpiod::line::value::INACTIVE);
 
-        // O destrutor de controle_linhas liberará o GPIO 17 automaticamente aqui.
     } 
     catch (const std::exception& e) {
         std::cerr << "Falha no hardware: " << e.what() << std::endl;
