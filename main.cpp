@@ -30,6 +30,8 @@ int main() {
   Reconhecedor reconhecedor;
   if (!reconhecedor.carregar()) return -1;
 
+  VideoCapture cap(0, CAP_V4L2);
+
   if (!cap.isOpened()) {
     cerr << "ERRO: Nao foi possivel conectar a camera via V4L2." << endl;
     return -1;
