@@ -12,6 +12,7 @@
 // As imagens (32x32) vão para dataset/<valores|naipes>/<classe>/N.png
 // e já passam pelo MESMO pré-processamento do reconhecimento.
 
+#include <cstdlib>
 #include <filesystem>
 #include <iostream>
 #include <map>
@@ -66,6 +67,12 @@ int main(int argc, char** argv) {
   cap.set(CAP_PROP_FRAME_WIDTH, 640);
   cap.set(CAP_PROP_FRAME_HEIGHT, 480);
 
+  cout << "Câmera aberta. Aguarde a janela 'Coleta' e escolha a classe pelas "
+          "teclas (ESC sai).\n";
+  if (!getenv("DISPLAY") && !getenv("WAYLAND_DISPLAY"))
+    cerr << "AVISO: sem display gráfico (SSH sem -X?). A janela não vai "
+            "aparecer.\n";
+
   string atual;                 // classe escolhida
   map<string, int> contagem;    // imagens por classe
   vector<string> lote;          // arquivos da última rajada (para desfazer)
@@ -75,7 +82,11 @@ int main(int argc, char** argv) {
   Mat bruto;
   while (true) {
     cap >> bruto;
-    if (bruto.empty()) break;
+    if (bruto.empty()) {
+      cerr << "Frame vazio: a câmera não entregou imagem. Verifique se outro "
+              "programa (ex.: o main) está usando /dev/video0.\n";
+      break;
+    }
     Mat frame = orientar(bruto);
 
     if ((roi & Rect(0, 0, frame.cols, frame.rows)) != roi) {
