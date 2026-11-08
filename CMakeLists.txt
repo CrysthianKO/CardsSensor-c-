@@ -13,5 +13,5 @@ find_package(OpenCV 4.6 REQUIRED)
 message(STATUS "Found OpenCV version: ${OpenCV_VERSION}")
 message(STATUS "OpenCV include directories: ${OpenCV_INCLUDE_DIRS}")
 
-add_executable(scanner main.cpp)
+add_executable(scanner main.cpp led.hpp)
 target_link_libraries(scanner PRIVATE ${OpenCV_LIBS} gpiodcxx)
