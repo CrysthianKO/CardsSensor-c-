@@ -22,10 +22,6 @@ string identificarSimbolo(const Mat& recorte, Ptr<SVM> modelo_svm,
 
   cvtColor(recorte, cinza, COLOR_BGR2GRAY);
 
-  // Gatilho de luminosidade (Mantido)
-  Scalar media_iluminacao = mean(cinza);
-  if (media_iluminacao[0] < 50.0) return "Vazio";
-
   // === 1. A MÁGICA DA ILUMINAÇÃO (OTSU) ===
   // Ao invés do 128 fixo, passamos 0 e a flag THRESH_OTSU.
   // O OpenCV calcula automaticamente a melhor separação de tinta/fundo para
