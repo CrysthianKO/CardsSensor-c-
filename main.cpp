@@ -1,3 +1,4 @@
+#include <chrono>
 #include <csignal>
 #include <gpiod.hpp>  // Header v2
 #include <iostream>
@@ -43,7 +44,10 @@ int main() {
 
   cout << "Camera USB (V4L2) inicializada com sucesso!" << endl;
 
-  bool carta_em_leitura = false;
+  bool em_cooldown = false;
+  auto momento_leitura = std::chrono::steady_clock::now();
+  const int DELAY_MILISEGUNDOS = 500;  // Ajuste este valor (0.5 segundos)
+
   string ultima;
   int repeticoes = 0;
   int contador = 0;
@@ -70,11 +74,15 @@ int main() {
     Mat recorte_naipe = frame(ROI_NAIPE);
     string leitura_debug;
 
-    if (carta_em_leitura) {
+    if (em_cooldown) {
+      auto tempo_passado =
+          std::chrono::duration_cast<std::chrono::milliseconds>(agora -
+                                                                momento_leitura)
+              .count();
       // Já leu: só confere (barato) se a carta saiu, sem rodar o SVM.
-      if (!haCarta(recorte_numero) || !haCarta(recorte_naipe)) {
+      if (tempo_passado > DELAY_MILISEGUNDOS) {
         cout << "--- Carta removida. Aguardando a proxima..." << endl;
-        carta_em_leitura = false;
+        em_cooldown = false;
         ultima.clear();
         repeticoes = 0;
       }
