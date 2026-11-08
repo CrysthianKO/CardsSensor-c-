@@ -65,8 +65,8 @@ int main() {
 
   // === 2. AJUSTE DO RECORTE (ROI) ===
   // Valores em Pixels: (Margem_Esquerda, Margem_Topo, Largura, Altura)
-  Rect ROI_NUMERO(196, 255, 78, 91);
-  Rect ROI_NAIPE(196, 348, 75, 91);
+  Rect ROI_NUMERO(207, 255, 78, 91);
+  Rect ROI_NAIPE(207, 348, 75, 91);
 
   Mat frame_bruto, frame;
 
