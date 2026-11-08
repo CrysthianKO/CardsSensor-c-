@@ -64,7 +64,6 @@ int main(int argc, char** argv) {
     cerr << "Não abriu a câmera\n";
     return 1;
   }
-  cap.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M', 'J', 'P', 'G'));
   cap.set(CAP_PROP_FRAME_WIDTH, 640);
   cap.set(CAP_PROP_FRAME_HEIGHT, 480);
 

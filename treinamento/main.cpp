@@ -29,8 +29,6 @@ int main() {
   VideoCapture cap(0, CAP_V4L2);
   if (!cap.isOpened()) return -1;
 
-  // MJPG alivia USB e CPU no Pi.
-  cap.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M', 'J', 'P', 'G'));
   cap.set(CAP_PROP_FRAME_WIDTH, 640);
   cap.set(CAP_PROP_FRAME_HEIGHT, 480);
 
