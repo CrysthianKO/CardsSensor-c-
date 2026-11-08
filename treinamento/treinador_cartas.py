@@ -66,7 +66,7 @@ def modo_captura(grupo):
     if alvo.lower() == "sair" or alvo not in simbolos:
         return
 
-    cap = cv2.VideoCapture(0)
+    cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
     # Lembre-se de ajustar este Rect para bater com a posição física do seu gabinete
     ROI = (150, 100, 60, 80)
 
