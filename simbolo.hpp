@@ -24,8 +24,8 @@ inline const std::vector<std::string> NOMES_NAIPES_PRETOS = {"Espadas", "Paus"};
 // ROIs com folga (x, y, largura, altura) no frame JÁ girado/espelhado.
 // Ajuste olhando a janela da coleta: o símbolo inteiro (incluindo o "10" e a
 // ponta do espadas) precisa caber com uma pequena borda.
-inline const cv::Rect ROI_NUMERO(195, 245, 100, 105);
-inline const cv::Rect ROI_NAIPE(195, 340, 100, 115);
+inline const cv::Rect ROI_NUMERO(179, 250, 79, 101);
+inline const cv::Rect ROI_NAIPE(179, 352, 82, 86);
 
 constexpr double LIMIAR_PRESENCA = 50.0;  // brilho médio mínimo com carta
 constexpr double LIMIAR_VERMELHO = 30.0;  // R - (G+B)/2 médio da tinta
@@ -49,7 +49,7 @@ inline bool haCarta(const cv::Mat& recorte) {
 }
 
 struct Simbolo {
-  cv::Mat img;          // LADO x LADO, CV_8UC1, tinta branca em fundo preto
+  cv::Mat img;            // LADO x LADO, CV_8UC1, tinta branca em fundo preto
   bool vermelho = false;  // cor da tinta (para separar os naipes)
 };
 
@@ -61,7 +61,8 @@ inline bool extrairSimbolo(const cv::Mat& recorte, Simbolo& saida) {
 
   // Blur leve em vez de erosão: não afina o símbolo e reduz ruído do Otsu.
   cv::GaussianBlur(cinza, cinza, cv::Size(3, 3), 0);
-  cv::threshold(cinza, binaria, 0, 255, cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
+  cv::threshold(cinza, binaria, 0, 255,
+                cv::THRESH_BINARY_INV | cv::THRESH_OTSU);
 
   std::vector<std::vector<cv::Point>> contornos;
   cv::findContours(binaria, contornos, cv::RETR_EXTERNAL,
@@ -85,7 +86,8 @@ inline bool extrairSimbolo(const cv::Mat& recorte, Simbolo& saida) {
   cv::Mat tinta = binaria(caixa);
   int lado = std::max(tinta.cols, tinta.rows);
   int margem = std::max(2, lado / 8);
-  cv::Mat quadrado = cv::Mat::zeros(lado + 2 * margem, lado + 2 * margem, CV_8UC1);
+  cv::Mat quadrado =
+      cv::Mat::zeros(lado + 2 * margem, lado + 2 * margem, CV_8UC1);
   int ox = margem + (lado - tinta.cols) / 2;
   int oy = margem + (lado - tinta.rows) / 2;
   tinta.copyTo(quadrado(cv::Rect(ox, oy, tinta.cols, tinta.rows)));
@@ -139,7 +141,8 @@ struct Reconhecedor {
     Simbolo s;
     if (!extrairSimbolo(recorte, s)) return "";
     const auto& modelo = s.vermelho ? vermelhos : pretos;
-    const auto& nomes = s.vermelho ? NOMES_NAIPES_VERMELHOS : NOMES_NAIPES_PRETOS;
+    const auto& nomes =
+        s.vermelho ? NOMES_NAIPES_VERMELHOS : NOMES_NAIPES_PRETOS;
     int i = static_cast<int>(modelo->predict(calcularHOG(s.img)));
     return (i >= 0 && i < static_cast<int>(nomes.size())) ? nomes[i] : "?";
   }
