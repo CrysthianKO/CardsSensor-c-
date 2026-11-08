@@ -64,6 +64,7 @@ int main(int argc, char** argv) {
     cerr << "Não abriu a câmera\n";
     return 1;
   }
+  cap.set(CAP_PROP_FOURCC, VideoWriter::fourcc('M', 'J', 'P', 'G'));
   cap.set(CAP_PROP_FRAME_WIDTH, 640);
   cap.set(CAP_PROP_FRAME_HEIGHT, 480);
 
@@ -80,13 +81,20 @@ int main(int argc, char** argv) {
   int rajada = 0;               // amostras que ainda faltam gravar
 
   Mat bruto;
+  int falhas = 0;
   while (true) {
     cap >> bruto;
     if (bruto.empty()) {
-      cerr << "Frame vazio: a câmera não entregou imagem. Verifique se outro "
-              "programa (ex.: o main) está usando /dev/video0.\n";
-      break;
+      // As primeiras leituras de algumas câmeras vêm vazias: tenta de novo.
+      if (++falhas >= 30) {
+        cerr << "Frame vazio 30x seguidas: a câmera não entregou imagem. "
+                "Verifique se outro programa está usando o dispositivo.\n";
+        break;
+      }
+      waitKey(50);
+      continue;
     }
+    falhas = 0;
     Mat frame = orientar(bruto);
 
     if ((roi & Rect(0, 0, frame.cols, frame.rows)) != roi) {
