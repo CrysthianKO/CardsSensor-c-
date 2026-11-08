@@ -1,151 +1,111 @@
 #include <opencv2/opencv.hpp>
+#include <opencv2/ml.hpp>
 #include <iostream>
-#include <filesystem>
-#include <map>
 #include <string>
+#include <vector>
 
-// Usamos namespace para não precisar escrever std:: toda hora
-namespace fs = std::filesystem;
 using namespace std;
 using namespace cv;
+using namespace cv::ml;
 
-// 1. Função para carregar os templates na memória
-// Retorna um "mapa" (equivalente ao dicionário do Python) ligando o nome à imagem
-map<string, Mat> carregarTemplates(const string& pasta) {
-    map<string, Mat> templates_salvos;
-    
-    // Itera por todos os arquivos dentro da pasta
-    for (const auto& entrada : fs::directory_iterator(pasta)) {
-        if (entrada.path().extension() == ".png") {
-            string nome = entrada.path().stem().string(); // Pega nome sem o .png
-            string caminho = entrada.path().string();
-            
-            // Carrega em tons de cinza
-            Mat img_template = imread(caminho, IMREAD_GRAYSCALE);
-            
-            // Verifica se a imagem foi encontrada
-            if (img_template.empty()) {
-                cout << "Erro ao carregar: " << caminho << endl;
-                continue;
-            }
-            
-            // Binarização: Pixels escuros viram pretos (0), claros viram brancos (255)
-            Mat template_binario;
-            threshold(img_template, template_binario, 128, 255, THRESH_BINARY_INV);
-            
-            templates_salvos[nome] = template_binario;
-            cout << "Template carregado: " << nome << endl;
-        }
-    }
-    return templates_salvos;
-}
-
-// Estrutura para retornar múltiplos valores (equivalente ao return nome, valor do Python)
-struct ResultadoIdentificacao {
-    string nome;
-    double confianca;
+// Este é o "gabarito". Os índices aqui precisam ser EXATAMENTE
+// iguais à ordem da lista CARACTERES que você usou no Python.
+const vector<string> NOME_SIMBOLOS = {
+    "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", 
+    "J", "Q", "K", "Copas", "Ouros", "Espadas", "Paus"
 };
 
-// 2. Função de Identificação
-ResultadoIdentificacao identificarSimbolo(const Mat& recorte_camera, const map<string, Mat>& templates) {
-    ResultadoIdentificacao melhor_resultado = {"Desconhecido", 0.0};
-    
-    Mat gray, img_binaria;
-    // Converte o recorte da câmera para cinza e binariza
-    cvtColor(recorte_camera, gray, COLOR_BGR2GRAY);
-    threshold(gray, img_binaria, 128, 255, THRESH_BINARY_INV);
+// Função que pega um recorte da imagem e passa pelo "Cérebro"
+string identificarSimbolo(const Mat& recorte, Ptr<SVM> modelo_svm) {
+    Mat cinza, binaria, redimensionada;
 
-    // Compara com cada template do nosso "dicionário"
-    for (const auto& par : templates) {
-        string nome_molde = par.first;
-        Mat img_molde = par.second;
-        
-        Mat matriz_resultado;
-        // Faz o Template Matching
-        matchTemplate(img_binaria, img_molde, matriz_resultado, TM_CCOEFF_NORMED);
-        
-        double min_val, max_val;
-        // Encontra o pico de similaridade na matriz de resultados
-        minMaxLoc(matriz_resultado, &min_val, &max_val);
-        
-        // Atualiza se achar algo com maior similaridade
-        if (max_val > melhor_resultado.confianca) {
-            melhor_resultado.confianca = max_val;
-            melhor_resultado.nome = nome_molde;
-        }
+    // 1. Prepara a imagem (mesmo tratamento que os dados sintéticos tiveram)
+    cvtColor(recorte, cinza, COLOR_BGR2GRAY);
+    threshold(cinza, binaria, 128, 255, THRESH_BINARY_INV); // Fundo preto, letra branca
+
+    // 2. Garante que a imagem tenha exatos 20x20 pixels
+    resize(binaria, redimensionada, Size(20, 20));
+
+    // 3. O "Moedor de Carne": Achatamento (Flatten)
+    // reshape(canais, linhas). Queremos 1 canal e 1 única linha (400 colunas)
+    Mat linha_pixels = redimensionada.reshape(1, 1);
+
+    // 4. Converte para o formato matemático que o SVM entende (Float 32 bits)
+    Mat entrada_svm;
+    linha_pixels.convertTo(entrada_svm, CV_32F);
+
+    // 5. A Mágica: Pergunta ao modelo qual é o resultado
+    // O predict retorna um número de ponto flutuante (ex: 12.0)
+    float previsao_numerica = modelo_svm->predict(entrada_svm);
+    
+    // Converte o número de volta para inteiro (ex: 12)
+    int indice = static_cast<int>(previsao_numerica);
+
+    // Retorna o nome humano daquele índice (ex: "K")
+    if (indice >= 0 && indice < NOME_SIMBOLOS.size()) {
+        return NOME_SIMBOLOS[indice];
     }
     
-    // Taxa de confiança (70%)
-    if (melhor_resultado.confianca > 0.7) {
-        return melhor_resultado;
-    }
-    
-    return {"Desconhecido", 0.0};
+    return "Desconhecido";
 }
 
 int main() {
-    cout << "Iniciando sistema em C++..." << endl;
+    cout << "Carregando a Inteligencia Artificial..." << endl;
     
-    // Carrega imagens da pasta "templates"
-    map<string, Mat> templates = carregarTemplates("templates/");
+    // Carrega o arquivo XML treinado no PC
+    Ptr<SVM> svm = SVM::load("modelo_cartas.xml");
     
-    if(templates.empty()){
-        cout << "Nenhum template encontrado. Encerrando." << endl;
+    if (svm->empty()) {
+        cout << "ERRO: Arquivo modelo_cartas.xml nao encontrado!" << endl;
         return -1;
     }
+    cout << "Modelo carregado com sucesso!" << endl;
 
-    // Inicializa a câmera usando V4L2 (Video4Linux2) para comunicação direta
+    // Inicializa a PiCamera via V4L2
     VideoCapture cap(0, CAP_V4L2);
-    
     if (!cap.isOpened()) {
-        cout << "Erro ao abrir a câmera!" << endl;
+        cout << "ERRO: Nao foi possivel abrir a camera." << endl;
         return -1;
     }
 
-    // Configuração de resolução (baixa resolução = alto desempenho)
+    // Configura para rodar super leve e rápido
     cap.set(CAP_PROP_FRAME_WIDTH, 640);
     cap.set(CAP_PROP_FRAME_HEIGHT, 480);
-    // Configura 30 frames por segundo
     cap.set(CAP_PROP_FPS, 30);
 
-    // Define a Região de Interesse (ROI) - X, Y, Largura, Altura
-    Rect ROI_CARTA(100, 50, 60, 120);
+    // Defina as posições fixas onde o Número e o Naipe vão aparecer na abertura
+    // (Ajuste os valores X, Y, Largura, Altura de acordo com o seu projeto físico)
+    Rect ROI_NUMERO(100, 50, 40, 60);
+    Rect ROI_NAIPE(100, 120, 40, 60);
 
-    Mat frame, recorte;
-    
-    cout << "Varredura iniciada. Pressione 'q' para sair." << endl;
+    Mat frame;
+    cout << "Iniciando scanner. Pressione 'q' para sair." << endl;
 
-    // Loop contínuo
     while (true) {
-        // Captura o frame direto do buffer de hardware
-        cap >> frame; 
-        
+        cap >> frame; // Captura imagem
         if (frame.empty()) break;
 
-        // Extrai a sub-matriz (apenas a área da carta) sem copiar dados na memória (super rápido!)
-        recorte = frame(ROI_CARTA);
+        // Recorta as regiões fixas da imagem
+        Mat recorte_numero = frame(ROI_NUMERO);
+        Mat recorte_naipe = frame(ROI_NAIPE);
 
-        // Processa o recorte
-        ResultadoIdentificacao res = identificarSimbolo(recorte, templates);
+        // Manda os recortes para o modelo analisar
+        string valor_carta = identificarSimbolo(recorte_numero, svm);
+        string naipe_carta = identificarSimbolo(recorte_naipe, svm);
 
-        // Feedback Visual
-        rectangle(frame, ROI_CARTA, Scalar(0, 255, 0), 2);
+        // Monta a string final (Ex: "A de Copas")
+        string resultado_final = valor_carta + " de " + naipe_carta;
+
+        // Desenha na tela para feedback
+        rectangle(frame, ROI_NUMERO, Scalar(255, 0, 0), 2);
+        rectangle(frame, ROI_NAIPE, Scalar(0, 0, 255), 2);
+        putText(frame, resultado_final, Point(ROI_NUMERO.x, ROI_NUMERO.y - 10), 
+                FONT_HERSHEY_SIMPLEX, 0.8, Scalar(0, 255, 0), 2);
         
-        string texto = res.nome + " (" + to_string(res.confianca).substr(0, 4) + ")";
-        putText(frame, texto, Point(ROI_CARTA.x, ROI_CARTA.y - 10), 
-                FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 255, 0), 2);
-        
-        imshow("Scanner Otimizado C++", frame);
+        imshow("Scanner Inteligente", frame);
 
-        // Espera 1ms por tecla, sai se for 'q'
-        if (waitKey(1) == 'q') {
-            break;
-        }
+        if (waitKey(1) == 'q') break;
     }
 
-    // Limpa a memória e fecha janelas (Boa prática no C++)
-    cap.release();
-    destroyAllWindows();
-    
     return 0;
 }
