@@ -1,117 +1,116 @@
-#include <gpiod.hpp>  // Header v2
-#include <iostream>
-#include <opencv2/ml.hpp>
 #include <opencv2/opencv.hpp>
+#include <opencv2/ml.hpp>
+#include <iostream>
 #include <string>
 #include <vector>
-
-#include "led.hpp"
 
 using namespace std;
 using namespace cv;
 using namespace cv::ml;
 
-// Este é o "gabarito". Os índices aqui precisam ser EXATAMENTE
-// iguais à ordem da lista CARACTERES que você usou no Python.
 const vector<string> NOME_SIMBOLOS = {
-    "A",  "2", "3", "4", "5",     "6",     "7",       "8",   "9",
-    "10", "J", "Q", "K", "Copas", "Ouros", "Espadas", "Paus"};
+    "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", 
+    "J", "Q", "K", "Copas", "Ouros", "Espadas", "Paus"
+};
 
-// Função que pega um recorte da imagem e passa pelo "Cérebro"
 string identificarSimbolo(const Mat& recorte, Ptr<SVM> modelo_svm) {
-  Mat cinza, binaria, redimensionada;
+    Mat cinza, binaria, redimensionada;
 
-  cvtColor(recorte, cinza, COLOR_BGR2GRAY);
-  threshold(cinza, binaria, 128, 255,
-            THRESH_BINARY_INV);  // Fundo preto, letra branca
+    cvtColor(recorte, cinza, COLOR_BGR2GRAY);
+    
+    // === 1. GATILHO DE SOFTWARE (VERIFICA SE HÁ CARTA) ===
+    // Calcula a média de brilho do recorte. 
+    // Uma carta branca refletindo o LED terá uma média alta (ex: > 100).
+    // O buraco escuro sem carta terá uma média baixa (ex: < 40).
+    Scalar media_iluminacao = mean(cinza);
+    
+    // AJUSTE AQUI: Se a leitura fantasma continuar, aumente este valor (ex: 60).
+    // Se ele ignorar cartas reais, diminua (ex: 30).
+    if (media_iluminacao[0] < 50.0) {
+        return "Vazio";
+    }
 
-  // 2. Garante que a imagem tenha exatos 20x20 pixels
-  resize(binaria, redimensionada, Size(20, 20));
+    // Se passou do gatilho, continua o processo normal
+    threshold(cinza, binaria, 128, 255, THRESH_BINARY_INV);
+    resize(binaria, redimensionada, Size(20, 20));
+    Mat linha_pixels = redimensionada.reshape(1, 1);
+    
+    Mat entrada_svm;
+    linha_pixels.convertTo(entrada_svm, CV_32F);
 
-  // 3. O "Moedor de Carne": Achatamento (Flatten)
-  // reshape(canais, linhas). Queremos 1 canal e 1 única linha (400 colunas)
-  Mat linha_pixels = redimensionada.reshape(1, 1);
+    float previsao = modelo_svm->predict(entrada_svm);
+    int indice = static_cast<int>(previsao);
 
-  // 4. Converte para o formato matemático que o SVM entende (Float 32 bits)
-  Mat entrada_svm;
-  linha_pixels.convertTo(entrada_svm, CV_32F);
-
-  // 5. A Mágica: Pergunta ao modelo qual é o resultado
-  // O predict retorna um número de ponto flutuante (ex: 12.0)
-  float previsao_numerica = modelo_svm->predict(entrada_svm);
-
-  // Converte o número de volta para inteiro (ex: 12)
-  int indice = static_cast<int>(previsao_numerica);
-
-  // Retorna o nome humano daquele índice (ex: "K")
-  if (indice >= 0 && indice < NOME_SIMBOLOS.size()) {
-    return NOME_SIMBOLOS[indice];
-  }
-
-  return "Desconhecido";
+    if (indice >= 0 && indice < NOME_SIMBOLOS.size()) {
+        return NOME_SIMBOLOS[indice];
+    }
+    
+    return "Erro";
 }
 
 int main() {
-  ControladorLed meu_led(17);
+    Ptr<SVM> svm = SVM::load("modelo_cartas.xml");
+    if (svm->empty()) return -1;
 
-  cout << "Carregando a Inteligencia Artificial..." << endl;
+    VideoCapture cap(0, CAP_V4L2);
+    if (!cap.isOpened()) return -1;
 
-  // Carrega o arquivo XML treinado no PC
-  Ptr<SVM> svm = SVM::load("modelo_cartas.xml");
+    cap.set(CAP_PROP_FRAME_WIDTH, 640);
+    cap.set(CAP_PROP_FRAME_HEIGHT, 480);
 
-  if (svm->empty()) {
-    cout << "ERRO: Arquivo modelo_cartas.xml nao encontrado!" << endl;
-    return -1;
-  }
-  cout << "Modelo carregado com sucesso!" << endl;
+    // === 2. AJUSTE DO RECORTE (ROI) ===
+    // Valores em Pixels: (Margem_Esquerda, Margem_Topo, Largura, Altura)
+    Rect ROI_NUMERO(150, 100, 60, 80); 
+    Rect ROI_NAIPE(150, 200, 60, 80);  
 
-  VideoCapture cap(0, CAP_V4L2);
-  if (!cap.isOpened()) {
-    cout << "ERRO: Nao foi possivel abrir a camera." << endl;
-    return -1;
-  }
+    Mat frame_bruto, frame;
+    
+    // Variáveis da Máquina de Estados
+    bool carta_em_leitura = false; 
 
-  // Configura para rodar super leve e rápido
-  cap.set(CAP_PROP_FRAME_WIDTH, 640);
-  cap.set(CAP_PROP_FRAME_HEIGHT, 480);
-  cap.set(CAP_PROP_FPS, 30);
+    while (true) {
+        cap >> frame_bruto; 
+        if (frame_bruto.empty()) break;
 
-  // Defina as posições fixas onde o Número e o Naipe vão aparecer na abertura
-  // (Ajuste os valores X, Y, Largura, Altura de acordo com o seu projeto
-  // físico)
-  Rect ROI_NUMERO(120, 50, 40, 60);
-  Rect ROI_NAIPE(120, 120, 40, 60);
+        // === 3. ROTAÇÃO DA CÂMERA ===
+        // Gira 90 graus para a direita (sentido horário). 
+        // Se a sua câmera estiver virada para o outro lado, mude para ROTATE_90_COUNTERCLOCKWISE
+        rotate(frame_bruto, frame, ROTATE_90_CLOCKWISE);
 
-  Mat frame;
-  cout << "Iniciando scanner. Pressione 'q' para sair." << endl;
-  meu_led.ligar();
-  while (true) {
-    cap >> frame;  // Captura imagem
-    if (frame.empty()) break;
+        // Recorta
+        Mat recorte_numero = frame(ROI_NUMERO);
+        Mat recorte_naipe = frame(ROI_NAIPE);
 
-    // Recorta as regiões fixas da imagem
-    Mat recorte_numero = frame(ROI_NUMERO);
-    Mat recorte_naipe = frame(ROI_NAIPE);
+        // Identifica
+        string valor = identificarSimbolo(recorte_numero, svm);
+        string naipe = identificarSimbolo(recorte_naipe, svm);
 
-    // Manda os recortes para o modelo analisar
-    string valor_carta = identificarSimbolo(recorte_numero, svm);
-    string naipe_carta = identificarSimbolo(recorte_naipe, svm);
+        // === 4. LÓGICA DE DETECÇÃO ÚNICA ===
+        if (valor != "Vazio" && naipe != "Vazio") {
+            // Se tem uma carta, mas ainda não tínhamos registrado ela
+            if (!carta_em_leitura) {
+                string resultado_final = valor + " de " + naipe;
+                cout << ">>> CARTA INSERIDA: " << resultado_final << endl;
+                
+                // Trava o estado para não imprimir 30 vezes por segundo
+                carta_em_leitura = true; 
+            }
+        } else {
+            // Se a média de luz caiu, a pessoa puxou a carta da máquina
+            if (carta_em_leitura) {
+                cout << "--- Carta removida. Aguardando a próxima..." << endl;
+                // Destrava o estado
+                carta_em_leitura = false;
+            }
+        }
 
-    // Monta a string final (Ex: "A de Copas")
-    string resultado_final = valor_carta + " de " + naipe_carta;
+        // Desenha na tela apenas para calibração
+        rectangle(frame, ROI_NUMERO, Scalar(255, 0, 0), 2);
+        rectangle(frame, ROI_NAIPE, Scalar(0, 0, 255), 2);
+        imshow("Scanner Inteligente", frame);
 
-    // Desenha na tela para feedback
-    rectangle(frame, ROI_NUMERO, Scalar(255, 0, 0), 2);
-    rectangle(frame, ROI_NAIPE, Scalar(0, 0, 255), 2);
-    putText(frame, resultado_final, Point(ROI_NUMERO.x, ROI_NUMERO.y - 10),
-            FONT_HERSHEY_SIMPLEX, 0.8, Scalar(0, 255, 0), 2);
+        if (waitKey(1) == 'q') break;
+    }
 
-    imshow("Scanner Inteligente", frame);
-
-    if (waitKey(1) == 'q') break;
-  }
-
-  meu_led.desligar();
-
-  return 0;
+    return 0;
 }
