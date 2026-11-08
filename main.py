@@ -1,5 +1,5 @@
 # 1. Importamos o 'tradutor' da câmera e o controlador de tempo
-from picamera import PiCamera
+from picamera import PiCamera2
 from time import sleep
 
 # 2. Inicializamos a câmera (o sensor liga neste momento)
