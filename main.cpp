@@ -53,7 +53,7 @@ int main() {
     cout << "Carregando a Inteligencia Artificial..." << endl;
     
     // Carrega o arquivo XML treinado no PC
-    Ptr<SVM> svm = SVM::load("baralho.xml");
+    Ptr<SVM> svm = SVM::load("modelo_cartas.xml");
     
     if (svm->empty()) {
         cout << "ERRO: Arquivo modelo_cartas.xml nao encontrado!" << endl;
