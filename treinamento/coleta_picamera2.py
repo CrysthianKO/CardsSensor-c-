@@ -17,6 +17,7 @@ Instalação (Raspberry Pi OS):
   sudo apt install python3-picamera2 python3-opencv
 Se usar venv, crie com:  python3 -m venv --system-site-packages venv
 """
+
 import sys
 import time
 from pathlib import Path
@@ -40,8 +41,10 @@ from coleta import (
 
 def iniciar_camera():
     if not Picamera2.global_camera_info():
-        print("O libcamera não detectou nenhuma câmera. Teste antes com "
-              "'rpicam-hello' (ou 'libcamera-hello') e confira o cabo flat.")
+        print(
+            "O libcamera não detectou nenhuma câmera. Teste antes com "
+            "'rpicam-hello' (ou 'libcamera-hello') e confira o cabo flat."
+        )
         return None
     picam2 = Picamera2()
     # Em picamera2, o formato "RGB888" entrega o array na ordem B,G,R, que é a
@@ -81,11 +84,13 @@ def main():
 
             x, y, w, h = roi
             if x + w > frame.shape[1] or y + h > frame.shape[0]:
-                print(f"ROI fora do frame ({frame.shape[1]}x{frame.shape[0]}). "
-                      "Ajuste os ROIs no coleta.py.")
+                print(
+                    f"ROI fora do frame ({frame.shape[1]}x{frame.shape[0]}). "
+                    "Ajuste os ROIs no coleta.py."
+                )
                 break
 
-            resultado = extrair_simbolo(frame[y:y + h, x:x + w])
+            resultado = extrair_simbolo(frame[y : y + h, x : x + w])
             ok = resultado is not None
             img, vermelho = resultado if ok else (None, False)
 
@@ -106,15 +111,28 @@ def main():
             cv2.rectangle(tela, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
             def texto(t, linha, cor):
-                cv2.putText(tela, t, (8, 22 + 22 * linha),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.55, cor, 2)
+                cv2.putText(
+                    tela,
+                    t,
+                    (8, 22 + 22 * linha),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.55,
+                    cor,
+                    2,
+                )
 
             if atual:
-                texto(f"Classe: {atual} ({contagem.get(atual, 0)} imgs)", 0, (255, 255, 0))
+                texto(
+                    f"Classe: {atual} ({contagem.get(atual, 0)} imgs)", 0, (255, 255, 0)
+                )
             else:
                 texto("Escolha a classe (teclas)", 0, (255, 255, 0))
             if ok:
-                texto("Simbolo OK - " + ("vermelho" if vermelho else "preto"), 1, (0, 255, 0))
+                texto(
+                    "Simbolo OK - " + ("vermelho" if vermelho else "preto"),
+                    1,
+                    (0, 255, 0),
+                )
             else:
                 texto("Simbolo NAO detectado", 1, (0, 0, 255))
             if not cor_ok:

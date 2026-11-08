@@ -17,6 +17,7 @@ ATENÇÃO: o pré-processamento abaixo é uma cópia fiel de simbolo.hpp
 
 No Raspberry, instale com:  sudo apt install python3-opencv
 """
+
 import sys
 import time
 from pathlib import Path
@@ -29,13 +30,24 @@ LADO = 32
 LIMIAR_PRESENCA = 50.0
 LIMIAR_VERMELHO = 30.0
 AREA_MIN = 15.0
-ROI_NUMERO = (195, 245, 100, 105)  # (x, y, largura, altura) no frame girado
-ROI_NAIPE = (195, 340, 100, 115)
+ROI_NUMERO = (179, 250, 100, 105)  # (x, y, largura, altura) no frame girado
+ROI_NAIPE = (179, 340, 100, 109)
 TAM_RAJADA = 20
 
 TECLAS_VALORES = {
-    "a": "A", "2": "2", "3": "3", "4": "4", "5": "5", "6": "6", "7": "7",
-    "8": "8", "9": "9", "0": "10", "j": "J", "q": "Q", "k": "K",
+    "a": "A",
+    "2": "2",
+    "3": "3",
+    "4": "4",
+    "5": "5",
+    "6": "6",
+    "7": "7",
+    "8": "8",
+    "9": "9",
+    "0": "10",
+    "j": "J",
+    "q": "Q",
+    "k": "K",
 }
 TECLAS_NAIPES = {"c": "Copas", "o": "Ouros", "e": "Espadas", "p": "Paus"}
 
@@ -53,11 +65,11 @@ def extrair_simbolo(recorte):
         return None
 
     cinza = cv2.GaussianBlur(cinza, (3, 3), 0)
-    _, binaria = cv2.threshold(
-        cinza, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU
-    )
+    _, binaria = cv2.threshold(cinza, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
 
-    contornos = cv2.findContours(binaria, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
+    contornos = cv2.findContours(binaria, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[
+        -2
+    ]
 
     # União das caixas de todos os contornos relevantes ("10", espadas...).
     area_max = 0.5 * recorte.shape[0] * recorte.shape[1]
@@ -70,8 +82,12 @@ def extrair_simbolo(recorte):
         if caixa is None:
             caixa = (x, y, x + w, y + h)
         else:
-            caixa = (min(caixa[0], x), min(caixa[1], y),
-                     max(caixa[2], x + w), max(caixa[3], y + h))
+            caixa = (
+                min(caixa[0], x),
+                min(caixa[1], y),
+                max(caixa[2], x + w),
+                max(caixa[3], y + h),
+            )
     if caixa is None:
         return None
 
@@ -83,7 +99,7 @@ def extrair_simbolo(recorte):
     quadrado = np.zeros((lado + 2 * margem, lado + 2 * margem), dtype=np.uint8)
     ox = margem + (lado - w) // 2
     oy = margem + (lado - h) // 2
-    quadrado[oy:oy + h, ox:ox + w] = tinta
+    quadrado[oy : oy + h, ox : ox + w] = tinta
     img = cv2.resize(quadrado, (LADO, LADO), interpolation=cv2.INTER_AREA)
 
     b, g, r, _ = cv2.mean(recorte[y0:y1, x0:x1], mask=binaria[y0:y1, x0:x1])
@@ -149,8 +165,10 @@ def main():
     print(f"Abrindo a câmera {indice}...")
     cap = abrir_camera(indice)
     if cap is None:
-        print("Nenhuma configuração entregou frames. Se isso também falhar aqui,"
-              " o problema está na câmera/driver/alimentação, não no código.")
+        print(
+            "Nenhuma configuração entregou frames. Se isso também falhar aqui,"
+            " o problema está na câmera/driver/alimentação, não no código."
+        )
         sys.exit(1)
     print("Câmera pronta. Escolha a classe pelas teclas (ESC sai).")
 
@@ -174,11 +192,13 @@ def main():
         frame = orientar(bruto)
         x, y, w, h = roi
         if x + w > frame.shape[1] or y + h > frame.shape[0]:
-            print(f"ROI fora do frame ({frame.shape[1]}x{frame.shape[0]}). "
-                  "A resolução não é 640x480; ajuste os ROIs.")
+            print(
+                f"ROI fora do frame ({frame.shape[1]}x{frame.shape[0]}). "
+                "A resolução não é 640x480; ajuste os ROIs."
+            )
             break
 
-        resultado = extrair_simbolo(frame[y:y + h, x:x + w])
+        resultado = extrair_simbolo(frame[y : y + h, x : x + w])
         ok = resultado is not None
         img, vermelho = resultado if ok else (None, False)
 
@@ -199,15 +219,18 @@ def main():
         cv2.rectangle(tela, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
         def texto(t, linha, cor):
-            cv2.putText(tela, t, (8, 22 + 22 * linha),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.55, cor, 2)
+            cv2.putText(
+                tela, t, (8, 22 + 22 * linha), cv2.FONT_HERSHEY_SIMPLEX, 0.55, cor, 2
+            )
 
         if atual:
             texto(f"Classe: {atual} ({contagem.get(atual, 0)} imgs)", 0, (255, 255, 0))
         else:
             texto("Escolha a classe (teclas)", 0, (255, 255, 0))
         if ok:
-            texto("Simbolo OK - " + ("vermelho" if vermelho else "preto"), 1, (0, 255, 0))
+            texto(
+                "Simbolo OK - " + ("vermelho" if vermelho else "preto"), 1, (0, 255, 0)
+            )
         else:
             texto("Simbolo NAO detectado", 1, (0, 0, 255))
         if not cor_ok:
