@@ -1,6 +1,8 @@
 #include <csignal>
 #include <gpiod.hpp>  // Header v2
 #include <iostream>
+#include <opencv2/ml.hpp>
+#include <opencv2/opencv.hpp>
 #include <string>
 
 #include "led.hpp"
@@ -19,26 +21,6 @@ constexpr int PULAR_FRAMES = 3;       // processa 1 a cada 3 frames (~10 fps)
 
 static volatile sig_atomic_t rodando = 1;
 
-// A câmera do Raspberry (módulo CSI) só é lida pelo OpenCV via GStreamer +
-// libcamera. Se não abrir, tenta uma câmera USB comum (V4L2).
-static bool abrirCamera(VideoCapture& cap) {
-  const string pipeline =
-      "libcamerasrc ! video/x-raw,width=640,height=480,framerate=30/1 ! "
-      "videoconvert ! video/x-raw,format=BGR ! "
-      "appsink drop=true max-buffers=1 sync=false";
-  if (cap.open(pipeline, CAP_GSTREAMER)) {
-    cout << "Camera aberta via libcamera (GStreamer)" << endl;
-    return true;
-  }
-  if (cap.open(0, CAP_V4L2)) {
-    cap.set(CAP_PROP_FRAME_WIDTH, 640);
-    cap.set(CAP_PROP_FRAME_HEIGHT, 480);
-    cout << "Camera aberta via V4L2 (USB)" << endl;
-    return true;
-  }
-  return false;
-}
-
 int main() {
   signal(SIGINT, [](int) { rodando = 0; });
 
@@ -48,11 +30,16 @@ int main() {
   Reconhecedor reconhecedor;
   if (!reconhecedor.carregar()) return -1;
 
-  VideoCapture cap;
-  if (!abrirCamera(cap)) {
-    cerr << "Nao consegui abrir a camera (nem libcamera, nem V4L2)." << endl;
+  if (!cap.isOpened()) {
+    cerr << "ERRO: Nao foi possivel conectar a camera via V4L2." << endl;
     return -1;
   }
+
+  // 3. Força a resolução necessária para que os recortes (ROI) caibam no frame
+  cap.set(CAP_PROP_FRAME_WIDTH, 640);
+  cap.set(CAP_PROP_FRAME_HEIGHT, 480);
+
+  cout << "Camera USB (V4L2) inicializada com sucesso!" << endl;
 
   bool carta_em_leitura = false;
   string ultima;
