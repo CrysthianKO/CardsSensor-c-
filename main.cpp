@@ -14,7 +14,7 @@ using namespace cartas;
 
 // Ligue para ver as janelas e a leitura atual durante a calibração;
 // desligue em produção (janelas custam CPU no Pi).
-constexpr bool DEBUG_VISUAL = true;
+constexpr bool DEBUG_VISUAL = false;
 
 constexpr int VOTOS_NECESSARIOS = 5;  // leituras iguais seguidas para aceitar
 constexpr int PULAR_FRAMES = 3;       // processa 1 a cada 3 frames (~10 fps)
