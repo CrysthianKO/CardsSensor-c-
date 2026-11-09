@@ -36,7 +36,8 @@ class Led:
         self.pino = pino
         try:
             import gpiod
-            self.chip = gpiod.Chip('gpiochip0')
+
+            self.chip = gpiod.Chip("gpiochip0")
             self.linha = self.chip.get_line(pino)
             self.linha.request(consumer="scanner", type=gpiod.LINE_REQ_DIR_OUT)
             self.ativo = True
@@ -70,16 +71,18 @@ def extrair_simbolo(recorte):
     cinza = cv2.cvtColor(recorte, cv2.COLOR_BGR2GRAY)
     if cv2.mean(cinza)[0] < LIMIAR_PRESENCA:
         return None
-    
+
     cinza_blur = cv2.GaussianBlur(cinza, (3, 3), 0)
-    _, binaria = cv2.threshold(cinza_blur, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU)
-    
+    _, binaria = cv2.threshold(
+        cinza_blur, 0, 255, cv2.THRESH_BINARY_INV | cv2.THRESH_OTSU
+    )
+
     contornos, _ = cv2.findContours(binaria, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    
+
     area_max = 0.5 * recorte.size / 3  # recorte.size é o total de pixels por canal
     x_min, y_min, x_max, y_max = 9999, 9999, -1, -1
     achou = False
-    
+
     for c in contornos:
         a = cv2.contourArea(c)
         if a < AREA_MIN or a > area_max:
@@ -90,27 +93,27 @@ def extrair_simbolo(recorte):
         x_max = max(x_max, x + w)
         y_max = max(y_max, y + h)
         achou = True
-        
+
     if not achou:
         return None
-        
+
     tinta = binaria[y_min:y_max, x_min:x_max]
     lado_sq = max(tinta.shape[1], tinta.shape[0])
     margem = max(2, lado_sq // 8)
-    
-    quadrado = np.zeros((lado_sq + 2*margem, lado_sq + 2*margem), dtype=np.uint8)
+
+    quadrado = np.zeros((lado_sq + 2 * margem, lado_sq + 2 * margem), dtype=np.uint8)
     ox = margem + (lado_sq - tinta.shape[1]) // 2
     oy = margem + (lado_sq - tinta.shape[0]) // 2
-    quadrado[oy:oy+tinta.shape[0], ox:ox+tinta.shape[1]] = tinta
-    
+    quadrado[oy : oy + tinta.shape[0], ox : ox + tinta.shape[1]] = tinta
+
     img_redim = cv2.resize(quadrado, (LADO, LADO), interpolation=cv2.INTER_AREA)
-    
+
     # Análise de cor da tinta (Verificação se é vermelho)
     mascara = binaria[y_min:y_max, x_min:x_max]
     recorte_roi = recorte[y_min:y_max, x_min:x_max]
     media_bgr = cv2.mean(recorte_roi, mask=mascara)
     vermelho = (media_bgr[2] - 0.5 * (media_bgr[0] + media_bgr[1])) > LIMIAR_VERMELHO
-    
+
     return img_redim, vermelho
 
 
@@ -151,7 +154,7 @@ def main():
         return 1
 
     led = Led(17)
-    
+
     # Inicia a thread que vai escutar os comandos do outro processo Python
     threading.Thread(target=ler_comandos, daemon=True).start()
     evento("PRONTO")
@@ -189,8 +192,8 @@ def main():
             frame = orientar(bruto)
             rx, ry, rw, rh = ROI_NUMERO
             nx, ny, nw, nh = ROI_NAIPE
-            rec_num = frame[ry:ry+rh, rx:rx+rw]
-            rec_nai = frame[ny:ny+nh, nx:nx+nw]
+            rec_num = frame[ry : ry + rh, rx : rx + rw]
+            rec_nai = frame[ny : ny + nh, nx : nx + nw]
 
             if carta_em_leitura:
                 # Carta já lida. Apenas verifica, via média de brilho, se ela foi removida.
@@ -201,13 +204,17 @@ def main():
                 res_v = extrair_simbolo(rec_num)
                 res_n = extrair_simbolo(rec_nai)
                 valor = naipe = ""
-                
+
                 if res_v is not None:
                     valor = prever(svm_valores, NOMES_VALORES, res_v[0])
                 if res_n is not None:
                     img_n, is_red = res_n
-                    naipe = prever(svm_vermelhos, NOMES_NAIPES_VERMELHOS, img_n) if is_red else prever(svm_pretos, NOMES_NAIPES_PRETOS, img_n)
-                
+                    naipe = (
+                        prever(svm_vermelhos, NOMES_NAIPES_VERMELHOS, img_n)
+                        if is_red
+                        else prever(svm_pretos, NOMES_NAIPES_PRETOS, img_n)
+                    )
+
                 if valor and naipe and valor != "?" and naipe != "?":
                     leitura = (valor, naipe)
                     repeticoes = repeticoes + 1 if leitura == ultima else 1
@@ -217,12 +224,18 @@ def main():
                         carta_em_leitura = True
                 else:
                     ultima, repeticoes = None, 0
-                    
+
+            cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (255, 0, 0), 2)
+            cv2.rectangle(frame, (nx, ny), (nx + nw, ny + nh), (0, 0, 255), 2)
+            cv2.imshow("Raio-X do Scanner", frame)
+            cv2.waitKey(1)
+
             time.sleep(0.1)  # Limita artificialmente a ~10 FPS para poupar CPU
     finally:
         if cap is not None:
             cap.release()
         led.desligar()
+
 
 if __name__ == "__main__":
     main()
