@@ -168,7 +168,7 @@ def main():
         while estado["rodando"]:
             # Controle de estado da câmera
             if estado["quer_camera"] and cap is None:
-                cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
+                cap = cv2.VideoCapture(0)
                 cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
                 cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
                 led.ligar()
@@ -186,6 +186,7 @@ def main():
 
             ret, bruto = cap.read()
             if not ret:
+                log("ERRO: A câmera iniciou, mas não está enviando imagens!")
                 time.sleep(0.1)
                 continue
 
