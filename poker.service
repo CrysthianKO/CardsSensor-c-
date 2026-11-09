@@ -4,10 +4,10 @@ After=network.target
 
 [Service]
 # Substitua "seu_usuario" pelo nome de usuário do Pi (ex: pi ou crys)
-User=seu_usuario
-WorkingDirectory=/home/seu_usuario/pasta_do_projeto
+User=uvinha
+WorkingDirectory=/home/uvinha/CardsSensor-c-
 # Comando para iniciar o servidor (se usar o uv, coloque o caminho completo dele)
-ExecStart=/home/seu_usuario/.cargo/bin/uv run servidor_mesa.py
+ExecStart=/home/uvinha/.cargo/bin/uv run servidor_mesa.py
 Restart=always
 RestartSec=3
 
