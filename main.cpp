@@ -105,8 +105,30 @@ int main() {
     // --- liga/desliga a câmera conforme o último comando recebido ---
     if (quer_camera && !camera_aberta) {
       if (abrirCamera(cap)) {
-        this_thread::sleep_for(chrono::milliseconds(500));
         camera_aberta = true;
+
+        // --- INÍCIO DO AQUECIMENTO ATIVO ---
+        // Força a câmera a cuspir os frames "sujos" e destravar o buffer V4L2
+        Mat frame_descarte;
+        bool sensor_acordou = false;
+
+        // Tenta ler até 50 vezes, aguardando 100ms entre tentativas (máximo de
+        // 5 segundos)
+        for (int i = 0; i < 50; i++) {
+          if (cap.read(frame_descarte) && !frame_descarte.empty()) {
+            sensor_acordou = true;
+            break;  // O sensor começou a enviar imagens reais
+          }
+          this_thread::sleep_for(chrono::milliseconds(100));
+        }
+
+        if (!sensor_acordou) {
+          cout << "ERRO;a camera falhou no aquecimento inicial" << endl;
+          quer_camera = false;
+          cap.release();
+          continue;  // Pula o resto do loop e volta para o início
+        }
+        // --- FIM DO AQUECIMENTO ATIVO ---
         resetar();
         meu_led.ligar();
         cout << "CAMERA_LIGADA" << endl;
