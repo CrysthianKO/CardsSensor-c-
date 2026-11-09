@@ -8,7 +8,7 @@ import numpy as np
 ROI_NUMERO = (179, 250, 79, 101)
 ROI_NAIPE = (179, 352, 82, 86)
 
-LIMIAR_PRESENCA = 100.0  # Teste aumentar de 50.0 para 100.0 ou 120.0
+LIMIAR_PRESENCA = 120.0  # Teste aumentar de 50.0 para 100.0 ou 120.0
 LIMIAR_VERMELHO = 30.0
 AREA_MIN = 15.0
 LADO = 32
