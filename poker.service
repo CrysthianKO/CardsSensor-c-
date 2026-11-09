@@ -7,7 +7,7 @@ After=network.target
 User=uvinha
 WorkingDirectory=/home/uvinha/CardsSensor-c-
 # Comando para iniciar o servidor (se usar o uv, coloque o caminho completo dele)
-ExecStart=/home/uvinha/.local/bin/uv run servidor_mesa.py
+ExecStart=/usr/bin/python3 /home/uvinha/CardsSensor-c-/servidor_mesa.py
 Restart=always
 RestartSec=3
 
