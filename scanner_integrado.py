@@ -237,10 +237,10 @@ def main():
                     ultima, repeticoes = None, 0
 
             # Janela de Raio-X para centralização da carta
-            cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (255, 0, 0), 2)
-            cv2.rectangle(frame, (nx, ny), (nx + nw, ny + nh), (0, 0, 255), 2)
-            cv2.imshow("Raio-X do Scanner", frame)
-            cv2.waitKey(1)
+            # cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (255, 0, 0), 2)
+            # cv2.rectangle(frame, (nx, ny), (nx + nw, ny + nh), (0, 0, 255), 2)
+            # cv2.imshow("Raio-X do Scanner", frame)
+            # cv2.waitKey(1)
 
             time.sleep(0.1)
     finally:
