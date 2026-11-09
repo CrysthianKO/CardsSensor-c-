@@ -20,8 +20,6 @@
 #include <csignal>
 #include <gpiod.hpp>  // Header v2
 #include <iostream>
-#include <opencv2/ml.hpp>
-#include <opencv2/opencv.hpp>
 #include <string>
 #include <thread>
 
@@ -62,17 +60,53 @@ static void threadComandos() {
   rodando = false;  // SAIR ou STDIN fechado
 }
 
-static bool abrirCamera(VideoCapture& cap) {
-  if (cap.open(0, CAP_V4L2)) {
-    cap.set(CAP_PROP_FRAME_WIDTH, 640);
-    cap.set(CAP_PROP_FRAME_HEIGHT, 480);
-    cerr << "Camera aberta via V4L2" << endl;
-    return true;
+// Só considera a câmera "aberta" se ela entregar um frame de verdade
+// (abrir o dispositivo não garante que existam imagens).
+static bool testarFrame(VideoCapture& cap) {
+  Mat teste;
+  for (int i = 0; i < 30; ++i) {
+    if (cap.read(teste) && !teste.empty()) return true;
+    this_thread::sleep_for(chrono::milliseconds(50));
   }
   return false;
 }
 
-int main() {
+// Tenta primeiro o V4L2 (câmeras USB e CSI em modo legado); se não entregar
+// frames, tenta o libcamera via GStreamer (módulo CSI do Raspberry).
+static bool abrirCamera(VideoCapture& cap, string& backend) {
+  if (cap.open(0, CAP_V4L2)) {
+    cap.set(CAP_PROP_FRAME_WIDTH, 640);
+    cap.set(CAP_PROP_FRAME_HEIGHT, 480);
+    if (testarFrame(cap)) {
+      cerr << "Camera aberta via V4L2" << endl;
+      backend = "V4L2";
+      return true;
+    }
+    cerr << "V4L2 abriu, mas nao entregou frames" << endl;
+    cap.release();
+  } else {
+    cerr << "V4L2 nao abriu" << endl;
+  }
+
+  const string pipeline =
+      "libcamerasrc ! video/x-raw,width=640,height=480,framerate=30/1 ! "
+      "videoconvert ! video/x-raw,format=BGR ! "
+      "appsink drop=true max-buffers=1 sync=false";
+  if (cap.open(pipeline, CAP_GSTREAMER)) {
+    if (testarFrame(cap)) {
+      cerr << "Camera aberta via libcamera (GStreamer)" << endl;
+      backend = "libcamera";
+      return true;
+    }
+    cerr << "libcamera abriu, mas nao entregou frames" << endl;
+    cap.release();
+  } else {
+    cerr << "libcamera (GStreamer) nao abriu" << endl;
+  }
+  return false;
+}
+
+static int executar() {
   signal(SIGINT, [](int) { rodando = false; });
 
   ControladorLed meu_led(17);
@@ -88,7 +122,7 @@ int main() {
   cout << "PRONTO" << endl;
 
   VideoCapture cap;
-
+  string backend;
   bool camera_aberta = false;
   bool carta_em_leitura = false;
   string ultima;
@@ -104,37 +138,14 @@ int main() {
   while (rodando) {
     // --- liga/desliga a câmera conforme o último comando recebido ---
     if (quer_camera && !camera_aberta) {
-      if (abrirCamera(cap)) {
+      if (abrirCamera(cap, backend)) {
         camera_aberta = true;
-
-        // --- INÍCIO DO AQUECIMENTO ATIVO ---
-        // Força a câmera a cuspir os frames "sujos" e destravar o buffer V4L2
-        Mat frame_descarte;
-        bool sensor_acordou = false;
-
-        // Tenta ler até 50 vezes, aguardando 100ms entre tentativas (máximo de
-        // 5 segundos)
-        for (int i = 0; i < 50; i++) {
-          if (cap.read(frame_descarte) && !frame_descarte.empty()) {
-            sensor_acordou = true;
-            break;  // O sensor começou a enviar imagens reais
-          }
-          this_thread::sleep_for(chrono::milliseconds(100));
-        }
-
-        if (!sensor_acordou) {
-          cout << "ERRO;a camera falhou no aquecimento inicial" << endl;
-          quer_camera = false;
-          cap.release();
-          continue;  // Pula o resto do loop e volta para o início
-        }
-        // --- FIM DO AQUECIMENTO ATIVO ---
         resetar();
         meu_led.ligar();
         cout << "CAMERA_LIGADA" << endl;
       } else {
         quer_camera = false;
-        cout << "ERRO;nao abriu a camera" << endl;
+        cout << "ERRO;nenhum backend (V4L2/libcamera) entregou frames" << endl;
       }
     } else if (!quer_camera && camera_aberta) {
       cap.release();
@@ -152,10 +163,9 @@ int main() {
 
     // grab() é barato (não decodifica); só processa 1 a cada N frames.
     if (!cap.grab()) {
-      this_thread::sleep_for(chrono::milliseconds(33));
-
+      this_thread::sleep_for(chrono::milliseconds(30));
       if (++falhas >= MAX_FALHAS) {
-        cout << "ERRO;a camera parou de entregar frames" << endl;
+        cout << "ERRO;a camera (" << backend << ") nao entregou frames" << endl;
         quer_camera = false;
       }
       continue;
@@ -222,4 +232,14 @@ int main() {
   if (camera_aberta) cap.release();
   meu_led.desligar();
   return 0;
+}
+
+int main() {
+  try {
+    return executar();
+  } catch (const std::exception& e) {
+    // Ex.: "error requesting GPIO lines: Device or resource busy"
+    cout << "ERRO;" << e.what() << endl;
+    return -1;
+  }
 }
