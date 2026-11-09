@@ -166,6 +166,10 @@ def main():
 
     try:
         while estado["rodando"]:
+            cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (255, 0, 0), 2)
+            cv2.rectangle(frame, (nx, ny), (nx + nw, ny + nh), (0, 0, 255), 2)
+            cv2.imshow("Raio-X do Scanner", frame)
+            cv2.waitKey(1)
             # Controle de estado da câmera
             if estado["quer_camera"] and cap is None:
                 cap = cv2.VideoCapture(0, cv2.CAP_V4L2)
@@ -224,11 +228,6 @@ def main():
                         carta_em_leitura = True
                 else:
                     ultima, repeticoes = None, 0
-
-            cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (255, 0, 0), 2)
-            cv2.rectangle(frame, (nx, ny), (nx + nw, ny + nh), (0, 0, 255), 2)
-            cv2.imshow("Raio-X do Scanner", frame)
-            cv2.waitKey(1)
 
             time.sleep(0.1)  # Limita artificialmente a ~10 FPS para poupar CPU
     finally:
