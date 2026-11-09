@@ -15,14 +15,13 @@
 // Mensagens para humanos (logs) vão para o STDERR, para não misturar com o
 // protocolo. Se o STDIN fechar (o outro programa morreu), este programa
 // encerra sozinho.
-#include <gpiod.hpp>  // Header v2
-
 #include <atomic>
 #include <chrono>
 #include <csignal>
+#include <gpiod.hpp>  // Header v2
+#include <iostream>
 #include <opencv2/ml.hpp>
 #include <opencv2/opencv.hpp>
-#include <iostream>
 #include <string>
 #include <thread>
 
@@ -63,6 +62,16 @@ static void threadComandos() {
   rodando = false;  // SAIR ou STDIN fechado
 }
 
+static bool abrirCamera(VideoCapture& cap) {
+  if (cap.open(0, CAP_V4L2)) {
+    cap.set(CAP_PROP_FRAME_WIDTH, 640);
+    cap.set(CAP_PROP_FRAME_HEIGHT, 480);
+    cerr << "Camera aberta via V4L2 (Cabo flat)" << endl;
+    return true;
+  }
+  return false;
+}
+
 int main() {
   signal(SIGINT, [](int) { rodando = false; });
 
@@ -78,7 +87,7 @@ int main() {
   thread(threadComandos).detach();
   cout << "PRONTO" << endl;
 
-  VideoCapture cap(0, CAP_V4L2);
+  VideoCapture cap;
 
   if (!cap.isOpened()) {
     cerr << "ERRO: Nao foi possivel conectar a camera via V4L2." << endl;
