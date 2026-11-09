@@ -105,6 +105,7 @@ int main() {
     // --- liga/desliga a câmera conforme o último comando recebido ---
     if (quer_camera && !camera_aberta) {
       if (abrirCamera(cap)) {
+        this_thread::sleep_for(chrono::milliseconds(500));
         camera_aberta = true;
         resetar();
         meu_led.ligar();
@@ -129,6 +130,8 @@ int main() {
 
     // grab() é barato (não decodifica); só processa 1 a cada N frames.
     if (!cap.grab()) {
+      this_thread::sleep_for(chrono::milliseconds(33));
+
       if (++falhas >= MAX_FALHAS) {
         cout << "ERRO;a camera parou de entregar frames" << endl;
         quer_camera = false;
