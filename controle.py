@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Exemplo simples de como um programa Python controla o scanner em C++.
 
-Uso:  python3 controle.py [caminho_do_executavel]      (padrão: ./main)
+Uso:  python3 controle.py [caminho_do_executavel] [pasta_dos_modelos]
+      (padrão: ./main; os modelo_*.xml são lidos da pasta do executável,
+       a menos que você informe outra pasta)
 
 O Python inicia o executável e conversa com ele por texto, uma linha por vez:
   Python -> C++ (stdin):  LIGAR | DESLIGAR | SAIR
@@ -13,25 +15,35 @@ A classe Scanner pode ser importada por outro programa (ex.: seu servidor):
     from controle import Scanner
     s = Scanner("./main"); s.esperar_pronto(); s.ligar() ...
 """
+
 import csv
 import subprocess
 import sys
 import threading
+import time
 from datetime import datetime
 from pathlib import Path
 
 
 class Scanner:
-    def __init__(self, executavel="./main", arquivo="cartas.csv"):
+    def __init__(self, executavel="./main", arquivo="cartas.csv", pasta_modelos=None):
         self.arquivo = Path(arquivo).resolve()
         self.ultima_carta = None  # (valor, naipe) da carta que está na máquina
         self._pronto = threading.Event()
 
         exe = Path(executavel).resolve()
-        # cwd = pasta do executável: é de lá que ele lê os modelo_*.xml
+        if not exe.is_file():
+            raise SystemExit(
+                f"Executável não encontrado: {exe}\n"
+                "Compile o main.cpp e passe o caminho do programa gerado, "
+                "ex.: python3 controle.py ./build/main"
+            )
+        # O C++ lê os modelo_*.xml da pasta de trabalho. Por padrão é a pasta do
+        # executável; se os .xml estiverem em outro lugar, passe pasta_modelos.
+        cwd = Path(pasta_modelos).resolve() if pasta_modelos else exe.parent
         self.proc = subprocess.Popen(
             [str(exe)],
-            cwd=str(exe.parent),
+            cwd=str(cwd),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             text=True,
@@ -56,12 +68,26 @@ class Scanner:
     def sair(self):
         try:
             self._enviar("SAIR")
+        except (BrokenPipeError, OSError):
+            pass  # o C++ já tinha encerrado
+        try:
+            self.proc.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+        try:
             self.proc.wait(timeout=5)
-        except Exception:
+        except subprocess.TimeoutExpired:
             self.proc.kill()
 
     def esperar_pronto(self, timeout=15):
-        return self._pronto.wait(timeout)
+        """True se o C++ avisou PRONTO; False se ele morreu ou demorou demais."""
+        fim = time.time() + timeout
+        while time.time() < fim:
+            if self._pronto.wait(0.2):
+                return True
+            if self.proc.poll() is not None:
+                return False
+        return False
 
     # ------------------------------------------------------------- eventos
     def _ler_eventos(self):
@@ -99,7 +125,8 @@ class Scanner:
 
 def main():
     exe = sys.argv[1] if len(sys.argv) > 1 else "./main"
-    scanner = Scanner(exe)
+    pasta_modelos = sys.argv[2] if len(sys.argv) > 2 else None
+    scanner = Scanner(exe, pasta_modelos=pasta_modelos)
 
     if not scanner.esperar_pronto():
         print("O scanner não ficou pronto (veja os erros acima).")
