@@ -41,8 +41,13 @@ class Scanner:
         # O C++ lê os modelo_*.xml da pasta de trabalho. Por padrão é a pasta do
         # executável; se os .xml estiverem em outro lugar, passe pasta_modelos.
         cwd = Path(pasta_modelos).resolve() if pasta_modelos else exe.parent
+        # Aceita tanto um executável compilado quanto um script Python
+        # (scanner.py); "-u" desliga o buffer de saída do Python.
+        comando = (
+            [sys.executable, "-u", str(exe)] if exe.suffix == ".py" else [str(exe)]
+        )
         self.proc = subprocess.Popen(
-            [str(exe)],
+            comando,
             cwd=str(cwd),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
