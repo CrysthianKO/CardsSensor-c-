@@ -99,6 +99,11 @@ def iniciar_servidor_sockets():
                     "seu_saldo": jogador.get("saldo"),
                     "msg": "Passe as cartas no scanner físico...",
                 })
+                # ADICIONE ESTAS TRÊS LINHAS AQUI:
+                global cartas_na_mao, cartas_na_mesa
+                cartas_na_mao = 0
+                cartas_na_mesa = 0
+                enviar_para_celulares({"tipo": "nova_rodada"})
         except Exception as e:
             print(f"[Rede] Erro no handshake: {e}")
 
