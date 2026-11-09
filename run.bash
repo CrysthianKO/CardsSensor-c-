@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BUILD_DIR="build"
-PROJECT_NAME="scanner"
+PROJECT_NAME="main"
 
 if [ ! -d "$BUILD_DIR" ]; then
     echo "Build directory not found. Configuring project..."
