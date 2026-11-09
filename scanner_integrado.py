@@ -155,7 +155,7 @@ def main():
 
     led = Led(17)
 
-    # Inicia a thread que vai escutar os comandos do outro processo Python
+    # Inicia a thread que escuta comandos
     threading.Thread(target=ler_comandos, daemon=True).start()
     evento("PRONTO")
 
@@ -166,16 +166,25 @@ def main():
 
     try:
         while estado["rodando"]:
-            # Controle de estado da câmera
+            # Controle de estado da câmera para o CABO FLAT (CSI) via picamera2
             if estado["quer_camera"] and cap is None:
-                cap = cv2.VideoCapture(0)
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+                from picamera2 import Picamera2
+
+                cap = Picamera2()
+                cap.configure(
+                    cap.create_video_configuration(
+                        main={"size": (640, 480), "format": "RGB888"}
+                    )
+                )
+                cap.start()
+                time.sleep(1.0)  # Tempo vital para a lente ajustar foco e exposição
                 led.ligar()
                 carta_em_leitura, ultima, repeticoes = False, None, 0
                 evento("CAMERA_LIGADA")
+
             elif not estado["quer_camera"] and cap is not None:
-                cap.release()
+                cap.stop()
+                cap.close()
                 cap = None
                 led.desligar()
                 evento("CAMERA_DESLIGADA")
@@ -184,9 +193,11 @@ def main():
                 time.sleep(0.1)
                 continue
 
-            ret, bruto = cap.read()
-            if not ret:
-                log("ERRO: A câmera iniciou, mas não está enviando imagens!")
+            # Captura de frame específica da biblioteca picamera2
+            try:
+                bruto = cap.capture_array("main")
+            except Exception as e:
+                log(f"ERRO: Falha ao capturar frame da câmera plana: {e}")
                 time.sleep(0.1)
                 continue
 
@@ -197,7 +208,6 @@ def main():
             rec_nai = frame[ny : ny + nh, nx : nx + nw]
 
             if carta_em_leitura:
-                # Carta já lida. Apenas verifica, via média de brilho, se ela foi removida.
                 if not ha_carta(rec_num) or not ha_carta(rec_nai):
                     evento("CARTA_REMOVIDA")
                     carta_em_leitura, ultima, repeticoes = False, None, 0
@@ -226,15 +236,17 @@ def main():
                 else:
                     ultima, repeticoes = None, 0
 
+            # Janela de Raio-X para centralização da carta
             cv2.rectangle(frame, (rx, ry), (rx + rw, ry + rh), (255, 0, 0), 2)
             cv2.rectangle(frame, (nx, ny), (nx + nw, ny + nh), (0, 0, 255), 2)
             cv2.imshow("Raio-X do Scanner", frame)
             cv2.waitKey(1)
 
-            time.sleep(0.1)  # Limita artificialmente a ~10 FPS para poupar CPU
+            time.sleep(0.1)
     finally:
         if cap is not None:
-            cap.release()
+            cap.stop()
+            cap.close()
         led.desligar()
 
 
